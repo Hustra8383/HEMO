@@ -105,7 +105,7 @@ export default function App() {
         }
       })
       .catch((err) => {
-        console.error('Session verification error:', err);
+        // Quietly reset session if expired/invalid
         localStorage.removeItem('hemo_userId');
         setUserId(null);
         setUser(null);
