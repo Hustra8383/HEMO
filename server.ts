@@ -365,8 +365,16 @@ app.post('/api/pair/join', (req, res) => {
     return res.status(400).json({ error: 'Invite code is required' });
   }
 
-  const cleanCode = inviteCode.trim().toUpperCase();
-  const userA = Object.values(db.users).find(u => u.inviteCode === cleanCode);
+  let cleanCode = inviteCode.trim().replace(/\s+/g, '').toUpperCase();
+  if (cleanCode && !cleanCode.startsWith('HM-') && cleanCode.length === 4) {
+    cleanCode = 'HM-' + cleanCode;
+  }
+
+  const userA = Object.values(db.users).find(u => {
+    if (!u.inviteCode) return false;
+    const dbCode = u.inviteCode.trim().replace(/\s+/g, '').toUpperCase();
+    return dbCode === cleanCode;
+  });
 
   if (!userA) {
     return res.status(400).json({ error: 'Invalid invitation code or partner already paired' });
