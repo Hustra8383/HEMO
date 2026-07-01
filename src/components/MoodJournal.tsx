@@ -10,6 +10,7 @@ import { Mood, MoodType } from '../types';
 
 interface MoodJournalProps {
   moods: Mood[];
+  partnerMoods?: Mood[];
   partnerName: string;
   onAddMood: (mood: Mood) => void;
   onRequestComfort: (moodType: MoodType, note: string) => Promise<string>;
@@ -28,7 +29,7 @@ const MOODS_DEFS: { type: MoodType; emoji: string; label: string; color: string;
   { type: 'angry', emoji: '😡', label: 'Angry', color: '#EF4444', gradient: 'from-red-500/20 to-orange-600/20' },
 ];
 
-export default function MoodJournal({ moods, partnerName, onAddMood, onRequestComfort }: MoodJournalProps) {
+export default function MoodJournal({ moods, partnerMoods = [], partnerName, onAddMood, onRequestComfort }: MoodJournalProps) {
   const [selectedType, setSelectedType] = useState<MoodType>('calm');
   const [note, setNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -66,8 +67,13 @@ export default function MoodJournal({ moods, partnerName, onAddMood, onRequestCo
   };
 
   const getMoodCount = (type: MoodType) => {
-    return moods.filter(m => m.type === type).length;
+    return moods.filter(m => m.type === type).length + partnerMoods.filter(m => m.type === type).length;
   };
+
+  const allMoods = [
+    ...moods.map(m => ({ ...m, userId: 'user_a' as const })),
+    ...partnerMoods.map(m => ({ ...m, userId: 'user_b' as const }))
+  ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   return (
     <div className="space-y-6" id="mood-journal-container">
@@ -275,15 +281,17 @@ export default function MoodJournal({ moods, partnerName, onAddMood, onRequestCo
               </div>
 
               <div className="space-y-3">
-                {moods.length === 0 ? (
+                {allMoods.length === 0 ? (
                   <p className="text-xs text-gray-500 italic">No mood logs saved yet.</p>
                 ) : (
-                  moods.map((m, idx) => (
+                  allMoods.map((m, idx) => (
                     <div key={idx} className="p-4 rounded-2xl bg-white/2 border border-white/5 flex flex-col md:flex-row justify-between gap-3 text-sm">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
                           <span className="text-lg">{m.emoji}</span>
-                          <span className="font-semibold text-gray-200 capitalize">{m.type.replace('_', ' ')}</span>
+                          <span className="font-semibold text-gray-200 capitalize">
+                            {m.userId === 'user_a' ? 'You' : partnerName} • {m.type.replace('_', ' ')}
+                          </span>
                         </div>
                         <p className="text-gray-400 font-light">{m.note}</p>
                       </div>

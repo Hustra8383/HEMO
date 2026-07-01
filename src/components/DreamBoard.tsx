@@ -12,9 +12,10 @@ interface DreamBoardProps {
   dreams: DreamCard[];
   onAddDream: (dream: DreamCard) => void;
   onRemoveDream: (id: string) => void;
+  onToggleDream?: (id: string) => void;
 }
 
-export default function DreamBoard({ dreams, onAddDream, onRemoveDream }: DreamBoardProps) {
+export default function DreamBoard({ dreams, onAddDream, onRemoveDream, onToggleDream }: DreamBoardProps) {
   const [activeBoardTab, setActiveBoardTab] = useState<'cards' | 'bucket'>('cards');
   
   // Custom Dream creation
@@ -25,13 +26,10 @@ export default function DreamBoard({ dreams, onAddDream, onRemoveDream }: DreamB
   const [description, setDescription] = useState('');
   const [isAdding, setIsAdding] = useState(false);
 
-  // Bucket list items (with visual checkpoints)
-  const [bucketList, setBucketList] = useState([
-    { id: 'b1', text: 'Trek the blooming Valley of Flowers in Uttarakhand', done: false },
-    { id: 'b2', text: 'Rent a silent cabin in Coorg for 1 full coding/study retreat', done: true },
-    { id: 'b3', text: 'Launch ChatGro to $30K MRR and donate 10% to tech education', done: false },
-    { id: 'b4', text: 'Co-publish a paper on advanced coordinate systems & algorithms', done: false },
-  ]);
+  // Filter dreams to get cardDreams and bucketList
+  const cardDreams = dreams.filter(d => d.type !== 'bucket');
+  const bucketList = dreams.filter(d => d.type === 'bucket');
+  
   const [newBucketText, setNewBucketText] = useState('');
 
   const handleAddDreamCard = () => {
@@ -55,13 +53,23 @@ export default function DreamBoard({ dreams, onAddDream, onRemoveDream }: DreamB
 
   const handleAddBucketItem = () => {
     if (newBucketText.trim()) {
-      setBucketList([...bucketList, { id: `bucket_${Date.now()}`, text: newBucketText.trim(), done: false }]);
+      const newBucketDream: DreamCard = {
+        id: `bucket_${Date.now()}`,
+        title: newBucketText.trim(),
+        type: 'bucket',
+        value: 'Aspirational',
+        description: 'Shared bucket list item',
+        completed: false
+      };
+      onAddDream(newBucketDream);
       setNewBucketText('');
     }
   };
 
   const handleToggleBucketItem = (id: string) => {
-    setBucketList(bucketList.map(item => item.id === id ? { ...item, done: !item.done } : item));
+    if (onToggleDream) {
+      onToggleDream(id);
+    }
   };
 
   return (
@@ -197,7 +205,7 @@ export default function DreamBoard({ dreams, onAddDream, onRemoveDream }: DreamB
             exit={{ opacity: 0 }}
             className="grid grid-cols-1 md:grid-cols-2 gap-6"
           >
-            {dreams.map((d) => (
+            {cardDreams.map((d) => (
               <div
                 key={d.id}
                 className="glass-panel p-6 rounded-3xl space-y-4 relative overflow-hidden group border border-white/5 hover:border-white/10 transition-all flex flex-col justify-between"
@@ -271,32 +279,43 @@ export default function DreamBoard({ dreams, onAddDream, onRemoveDream }: DreamB
             </div>
 
             <div className="space-y-2.5">
-              {bucketList.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => handleToggleBucketItem(item.id)}
-                  className={`p-4 rounded-2xl border transition-all flex items-center justify-between cursor-pointer ${
-                    item.done
-                      ? 'bg-gradient-to-r from-pink-500/10 to-indigo-500/10 border-pink-500/20'
-                      : 'bg-white/2 border-white/5 hover:bg-white/4'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center border transition-all ${
-                      item.done ? 'bg-pink-500 border-pink-400 text-white' : 'border-gray-600'
-                    }`}>
-                      {item.done && <Check className="w-4 h-4" />}
+              {bucketList.length === 0 ? (
+                <p className="text-xs text-gray-500 italic py-6 text-center">No adventure bucket list items pinned yet.</p>
+              ) : (
+                bucketList.map((item) => (
+                  <div
+                    key={item.id}
+                    className={`p-4 rounded-2xl border transition-all flex items-center justify-between ${
+                      item.completed
+                        ? 'bg-gradient-to-r from-pink-500/10 to-indigo-500/10 border-pink-500/20'
+                        : 'bg-white/2 border-white/5 hover:bg-white/4'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 cursor-pointer flex-1" onClick={() => handleToggleBucketItem(item.id)}>
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center border transition-all ${
+                        item.completed ? 'bg-pink-500 border-pink-400 text-white' : 'border-gray-600'
+                      }`}>
+                        {item.completed && <Check className="w-4 h-4" />}
+                      </div>
+                      <span className={`text-sm font-light ${item.completed ? 'line-through text-gray-500' : 'text-gray-200'}`}>
+                        {item.title}
+                      </span>
                     </div>
-                    <span className={`text-sm font-light ${item.done ? 'line-through text-gray-500' : 'text-gray-200'}`}>
-                      {item.text}
-                    </span>
-                  </div>
 
-                  <span className="text-[9px] font-mono uppercase tracking-widest text-gray-500">
-                    {item.done ? 'Accomplished' : 'Aspirational'}
-                  </span>
-                </div>
-              ))}
+                    <div className="flex items-center gap-3">
+                      <span className="text-[9px] font-mono uppercase tracking-widest text-gray-500">
+                        {item.completed ? 'Accomplished' : 'Aspirational'}
+                      </span>
+                      <button
+                        onClick={() => onRemoveDream(item.id)}
+                        className="text-gray-600 hover:text-red-400 transition-colors p-1 rounded-lg hover:bg-white/5 cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
 
             <div className="flex gap-2 pt-4">

@@ -96,6 +96,7 @@ export interface VoiceNote {
   timestamp: string;
   isFavorite: boolean;
   uploaderId: string;
+  audioData?: string; // Base64 data URI of recorded voice note
 }
 
 export interface TwistOfDay {
@@ -125,6 +126,7 @@ export interface DreamCard {
   targetDate?: string;
   progress?: number; // 0-100
   description: string;
+  completed?: boolean; // toggle state for bucket list items
 }
 
 export interface TimeCapsule {

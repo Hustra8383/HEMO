@@ -21,6 +21,10 @@ export default function VoiceNotes({ voiceNotes, onAddVoiceNote, onRemoveVoiceNo
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [waveformBars, setWaveformBars] = useState<number[]>([]);
 
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
+  const [audioPlayer, setAudioPlayer] = useState<HTMLAudioElement | null>(null);
+
   // Waveform animation intervals
   const recordIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const playOscRef = useRef<OscillatorNode | null>(null);
@@ -46,23 +50,56 @@ export default function VoiceNotes({ voiceNotes, onAddVoiceNote, onRemoveVoiceNo
     };
   }, [isRecording]);
 
-  const handleStartRecord = () => {
-    setIsRecording(true);
+  const handleStartRecord = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks: Blob[] = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunks.push(e.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64Audio = reader.result as string;
+          const newNote: VoiceNote = {
+            id: `vn_${Date.now()}`,
+            duration: recordDuration || 3,
+            transcript: 'Real-time companion voice memo.',
+            timestamp: new Date().toISOString(),
+            isFavorite: false,
+            uploaderId: 'user_a',
+            audioData: base64Audio
+          };
+          onAddVoiceNote(newNote);
+        };
+        reader.readAsDataURL(audioBlob);
+
+        // Stop stream tracks
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      setAudioChunks([]);
+      setMediaRecorder(recorder);
+      recorder.start();
+      setIsRecording(true);
+      setRecordDuration(0);
+    } catch (err) {
+      console.error('Failed to get audio stream', err);
+      alert('Could not access microphone. Please ensure permissions are granted in your browser settings.');
+    }
   };
 
   const handleStopRecord = () => {
-    setIsRecording(false);
-    
-    // Create new voice note
-    const newNote: VoiceNote = {
-      id: `vn_${Date.now()}`,
-      duration: recordDuration || 14, // fallback duration
-      transcript: 'Direct morning audio memo whispered safely.',
-      timestamp: new Date().toISOString(),
-      isFavorite: false,
-      uploaderId: 'user_a',
-    };
-    onAddVoiceNote(newNote);
+    if (mediaRecorder && isRecording) {
+      mediaRecorder.stop();
+      setIsRecording(false);
+    }
   };
 
   const handlePlayVoiceNote = (vn: VoiceNote) => {
@@ -72,43 +109,60 @@ export default function VoiceNotes({ voiceNotes, onAddVoiceNote, onRemoveVoiceNo
     }
 
     handleStopPlayback();
-    setPlayingId(vn.id);
 
-    // Synthesize premium futuristic audio note beep using Web Audio API
-    try {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      const ctx = new AudioContextClass();
-      playCtxRef.current = ctx;
+    if (vn.audioData) {
+      const player = new Audio(vn.audioData);
+      setAudioPlayer(player);
+      setPlayingId(vn.id);
 
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(330, ctx.currentTime); // standard melodious E note
-      
-      // Pitch slide effect
-      osc.frequency.exponentialRampToValueAtTime(110, ctx.currentTime + vn.duration);
-
-      gain.gain.setValueAtTime(0.06, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + vn.duration);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start();
-      playOscRef.current = osc;
-
-      // Automatically clear playing state when voice note completes
-      setTimeout(() => {
+      player.onended = () => {
         setPlayingId(null);
-      }, vn.duration * 1000);
-    } catch (e) {
-      console.error(e);
+        setAudioPlayer(null);
+      };
+
+      player.play().catch(err => {
+        console.error('Audio playback failed', err);
+      });
+    } else {
+      // Fallback synthesizer
+      setPlayingId(vn.id);
+      try {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        const ctx = new AudioContextClass();
+        playCtxRef.current = ctx;
+
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(330, ctx.currentTime);
+
+        osc.frequency.exponentialRampToValueAtTime(110, ctx.currentTime + vn.duration);
+
+        gain.gain.setValueAtTime(0.06, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + vn.duration);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start();
+        playOscRef.current = osc;
+
+        setTimeout(() => {
+          setPlayingId(null);
+        }, vn.duration * 1000);
+      } catch (e) {
+        console.error(e);
+      }
     }
   };
 
   const handleStopPlayback = () => {
     setPlayingId(null);
+    if (audioPlayer) {
+      audioPlayer.pause();
+      setAudioPlayer(null);
+    }
     if (playOscRef.current) {
       try {
         playOscRef.current.stop();
@@ -192,7 +246,7 @@ export default function VoiceNotes({ voiceNotes, onAddVoiceNote, onRemoveVoiceNo
         {/* Right: Library of notes (3 cols) */}
         <div className="md:col-span-3 glass-panel p-6 rounded-3xl space-y-4">
           <h4 className="text-xs uppercase tracking-widest text-indigo-400 font-bold block">Library Logs</h4>
-          
+
           <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
             {voiceNotes.length === 0 ? (
               <p className="text-xs text-gray-500 italic py-6 text-center">No voice notes saved today.</p>
@@ -217,13 +271,13 @@ export default function VoiceNotes({ voiceNotes, onAddVoiceNote, onRemoveVoiceNo
                         <Play className="w-5 h-5 fill-gray-400 translate-x-0.5" />
                       )}
                     </button>
-                    
+
                     <div className="space-y-1 w-full">
                       <div className="flex justify-between text-[10px] text-gray-500 font-mono">
                         <span>From: <b>{note.uploaderId === 'user_a' ? 'You' : partnerName}</b></span>
                         <span>{new Date(note.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
                       </div>
-                      
+
                       {/* Simulated wave strip */}
                       <div className="flex gap-0.5 items-center h-4 pt-1 w-full opacity-60">
                         {Array.from({ length: 30 }).map((_, i) => (

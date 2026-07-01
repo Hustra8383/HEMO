@@ -29,7 +29,7 @@ import {
   ChevronLeft
 } from 'lucide-react';
 
-import { FullHEMOState, Mood, LiveStatus, Goal, Habit, Memory, VoiceNote, TwistOfDay, TimeCapsule, RelationshipMilestone, Meme, NightReflection, Profile, CompanionState } from './types';
+import { FullHEMOState, Mood, LiveStatus, Goal, Habit, Memory, VoiceNote, TwistOfDay, TimeCapsule, RelationshipMilestone, Meme, NightReflection, Profile, CompanionState, IHaveYouAction } from './types';
 import { TwistResponse } from './components/TwistOfTheDay';
 
 // Subcomponents
@@ -166,6 +166,58 @@ export default function App() {
     }, 4000);
   };
 
+  // Poll server for state synchronization and new partner alerts
+  useEffect(() => {
+    if (!userId || !user?.groupId) return;
+
+    const pollInterval = setInterval(() => {
+      fetch('/api/state', {
+        headers: { 'X-User-ID': userId }
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error('Poll failed');
+          return res.json();
+        })
+        .then((stateData: FullHEMOState) => {
+          if (state && stateData.actions.length > state.actions.length) {
+            // Check for new partner actions (perspective: user_b is partner)
+            const newPartnerActions = stateData.actions.filter(
+              newAct => newAct.senderId === 'user_b' && !state.actions.some(oldAct => oldAct.id === newAct.id)
+            );
+            if (newPartnerActions.length > 0) {
+              const latestAction = newPartnerActions[0];
+              if (latestAction.type === 'hug') {
+                handleTriggerComfortBurst();
+                setActiveAlert({ type: 'hug', message: latestAction.message });
+              } else if (latestAction.type === 'emergency' || latestAction.type === 'comfort') {
+                setActiveAlert({ type: 'emergency', message: latestAction.message });
+              }
+            }
+          }
+          setState(stateData);
+        })
+        .catch((err) => {
+          console.warn('Real-time sync poll failed:', err);
+        });
+    }, 4000);
+
+    return () => clearInterval(pollInterval);
+  }, [userId, user?.groupId, state?.actions]);
+
+  // Broadcast comfort and alert actions to partner
+  const handleTriggerPartnerAction = async (type: 'hug' | 'comfort' | 'motivation' | 'call' | 'advice' | 'emergency', msg: string) => {
+    if (!state || !userId) return;
+    const newAction: IHaveYouAction = {
+      id: `act_${Date.now()}`,
+      senderId: 'user_a', // frontend perspective
+      type,
+      message: msg,
+      timestamp: new Date().toISOString(),
+      acknowledged: false,
+    };
+    await saveStateField('actions', [newAction, ...state.actions]);
+  };
+
   // Trigger comfort response from Gemini
   const handleRequestComfort = async (moodType: string, noteText: string) => {
     if (!state || !userId) return "";
@@ -284,7 +336,7 @@ export default function App() {
     );
   }
 
-  const { settings, userAMoods, userBMoods, userAStatus, userBStatus, userACheckIns, userAGoals, habitsA, memories, voiceNotes, twists, dreams, capsules, milestones, memes, reflections } = state;
+  const { settings, userAMoods, userBMoods, userAStatus, userBStatus, userACheckIns, userBCheckIns, userAGoals, habitsA, memories, voiceNotes, twists, dreams, capsules, milestones, memes, reflections } = state;
 
   // Compute stats
   const totalCompletedGoals = userAGoals.filter(g => g.completed).length;
@@ -547,7 +599,13 @@ export default function App() {
                           <Flame className="w-6 h-6 text-pink-500 animate-bounce" />
                         </div>
                         <div>
-                          <span className="text-3xl font-mono font-bold tracking-tight">32 days</span>
+                          <span className="text-3xl font-mono font-bold tracking-tight">
+                            {(() => {
+                              const start = settings.relationshipStartDate || new Date().toISOString().split('T')[0];
+                              const diffDays = Math.max(1, Math.floor(Math.abs(Date.now() - new Date(start).getTime()) / (1000 * 60 * 60 * 24)));
+                              return `${diffDays} days`;
+                            })()}
+                          </span>
                           <span className="text-[10px] text-gray-400 block font-mono uppercase">Consecutive Aligned Connection</span>
                         </div>
                       </div>
@@ -576,15 +634,36 @@ export default function App() {
                         <Calendar className="w-4 h-4 text-indigo-400" />
                       </div>
 
-                      <div>
-                        <h4 className="text-md font-serif font-semibold text-gray-100">JEE Advanced CSE Exam</h4>
-                        <p className="text-xs text-gray-400 font-light mt-1">Syllabus revision tracking is on schedule. Keep the daily mathematics focus sprint flowing.</p>
-                      </div>
-                    </div>
-
-                    <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl flex justify-between items-center text-xs">
-                      <span className="text-indigo-300 font-mono font-bold">94 Days Left</span>
-                      <span className="text-[10px] text-gray-500 font-mono uppercase">Target: Computer Science</span>
+                      {dreams.filter(d => d.type === 'countdown').length > 0 ? (
+                        (() => {
+                          const countdownCard = dreams.filter(d => d.type === 'countdown')[0];
+                          return (
+                            <>
+                              <div>
+                                <h4 className="text-md font-serif font-semibold text-gray-100">{countdownCard.title}</h4>
+                                <p className="text-xs text-gray-400 font-light mt-1">{countdownCard.description}</p>
+                              </div>
+                              <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl flex justify-between items-center text-xs">
+                                <span className="text-indigo-300 font-mono font-bold">{countdownCard.value}</span>
+                                <span className="text-[10px] text-gray-500 font-mono uppercase">Target Goal</span>
+                              </div>
+                            </>
+                          );
+                        })()
+                      ) : (
+                        <>
+                          <div>
+                            <h4 className="text-md font-serif font-semibold text-gray-100">No Countdown Active</h4>
+                            <p className="text-xs text-gray-400 font-light mt-1">Pin a countdown card to your Dream Board to display real-time connection targets here.</p>
+                          </div>
+                          <button
+                            onClick={() => setActiveTab('dreams')}
+                            className="p-3 bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 rounded-2xl text-center text-xs font-semibold text-indigo-300 transition-all cursor-pointer"
+                          >
+                            Add Countdown Card ➔
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -631,7 +710,7 @@ export default function App() {
                       <button
                         onClick={() => {
                           handleTriggerComfortBurst();
-                          handleSendAlertSignal('hug', `${settings.userA.nickname} squeezed an instant Virtual Hug on your dashboard! 🫂💖`);
+                          handleTriggerPartnerAction('hug', `${settings.userA.nickname} sent you an instant Virtual Hug! 🫂💖`);
                         }}
                         className="py-3 px-4 bg-pink-500/20 hover:bg-pink-500/35 border border-pink-500/30 text-pink-200 rounded-2xl text-xs font-semibold transition-all cursor-pointer"
                       >
@@ -670,6 +749,7 @@ export default function App() {
             {activeTab === 'mood' && (
               <MoodJournal
                 moods={userAMoods}
+                partnerMoods={userBMoods}
                 partnerName={settings.userB.nickname}
                 onAddMood={(m) => saveStateField('userAMoods', [m, ...userAMoods])}
                 onRequestComfort={handleRequestComfort}
@@ -680,7 +760,10 @@ export default function App() {
               <CalmMeDown
                 partnerName={settings.settings?.userB?.nickname || settings.userB.nickname}
                 memories={memories}
-                onComfortTrigger={handleTriggerComfortBurst}
+                onComfortTrigger={() => {
+                  handleTriggerComfortBurst();
+                  handleTriggerPartnerAction('hug', `${settings.userA.nickname} sent you an instant Virtual Hug! 🫂💖`);
+                }}
               />
             )}
 
@@ -706,6 +789,10 @@ export default function App() {
                 dreams={dreams}
                 onAddDream={(d) => saveStateField('dreams', [d, ...dreams])}
                 onRemoveDream={(id) => saveStateField('dreams', dreams.filter(d => d.id !== id))}
+                onToggleDream={(id) => {
+                  const updated = dreams.map(d => d.id === id ? { ...d, completed: !d.completed } : d);
+                  saveStateField('dreams', updated);
+                }}
               />
             )}
 
@@ -744,15 +831,24 @@ export default function App() {
 
             {activeTab === 'checkins' && (
               <DailyCheckIns
-                checkIns={userACheckIns.map((c: any) => ({
-                  id: c.timestamp,
-                  statusText: c.label,
-                  emoji: '📍',
-                  timestamp: c.timestamp,
-                  userId: 'user_a'
-                }))}
+                checkIns={[
+                  ...userACheckIns.map((c: any) => ({
+                    id: c.timestamp,
+                    statusText: c.label,
+                    emoji: c.emoji || '📍',
+                    timestamp: c.timestamp,
+                    userId: 'user_a'
+                  })),
+                  ...userBCheckIns.map((c: any) => ({
+                    id: c.timestamp,
+                    statusText: c.label,
+                    emoji: c.emoji || '📍',
+                    timestamp: c.timestamp,
+                    userId: 'user_b'
+                  }))
+                ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())}
                 onAddCheckIn={(text, emoji) => {
-                  const newC = { type: 'custom' as any, label: text, timestamp: new Date().toISOString() };
+                  const newC = { type: 'custom' as any, label: text, emoji, timestamp: new Date().toISOString() };
                   saveStateField('userACheckIns', [newC, ...userACheckIns]);
                 }}
                 partnerName={settings.userB.nickname}
