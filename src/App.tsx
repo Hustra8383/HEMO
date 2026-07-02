@@ -611,6 +611,7 @@ export default function App() {
           <nav className="space-y-1.5 overflow-y-auto max-h-[60vh] pr-1">
             {[
               { id: 'home', label: 'Dashboard', icon: Heart },
+              { id: 'need', label: 'I Need You', icon: AlertOctagon },
               { id: 'status', label: 'Live Presence', icon: Activity },
               { id: 'mood', label: 'Mood Journal', icon: Smile },
               { id: 'calm', label: 'Relax Sanctuary', icon: Wind },
@@ -670,6 +671,7 @@ export default function App() {
           className="p-1.5 rounded-xl bg-white/5 border border-white/10 text-xs text-gray-300 font-mono"
         >
           <option value="home">Dashboard</option>
+          <option value="need">I Need You</option>
           <option value="status">Live Presence</option>
           <option value="mood">Mood Journal</option>
           <option value="calm">Relax Sanctuary</option>
@@ -708,6 +710,19 @@ export default function App() {
                 triggerVibration={triggerVibration}
                 showLocalNotification={showLocalNotification}
                 setActiveTab={setActiveTab}
+              />
+            )}
+
+            {activeTab === 'need' && (
+              <NeedYou
+                partnerName={settings.userB.nickname}
+                onSendAlert={(type, message) => {
+                  handleTriggerPartnerAction(type as any, message);
+                }}
+                onComfortTrigger={() => {
+                  handleTriggerComfortBurst();
+                  handleTriggerPartnerAction('hug', `${settings.userA.nickname} sent you an instant Virtual Hug! 🫂💖`);
+                }}
               />
             )}
 
