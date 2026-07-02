@@ -161,6 +161,56 @@ export default function App() {
     setActiveTab('home');
   };
 
+  // Programmatic sweet synthesizer chime (C5 -> E5 -> G5 -> C6 arpeggio)
+  const playChime = () => {
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return;
+      const ctx = new AudioContextClass();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+      osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.12); // E5
+      osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.24); // G5
+      osc.frequency.setValueAtTime(1046.50, ctx.currentTime + 0.36); // C6
+      
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.7);
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      
+      osc.start();
+      osc.stop(ctx.currentTime + 0.7);
+    } catch (e) {
+      console.warn('Audio chime blocked or unsupported:', e);
+    }
+  };
+
+  // Device vibration feedback
+  const triggerVibration = () => {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try {
+        navigator.vibrate([200, 100, 200]);
+      } catch (e) {
+        // ignore
+      }
+    }
+  };
+
+  // Display browser notification
+  const showLocalNotification = (title: string, body: string) => {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      try {
+        new Notification(title, { body });
+      } catch (err) {
+        console.warn('Browser push notification failed:', err);
+      }
+    }
+  };
+
   // Trigger heart overlay simulation
   const handleTriggerComfortBurst = () => {
     setShowHeartBurst(true);
@@ -169,43 +219,80 @@ export default function App() {
     }, 4000);
   };
 
-  // Poll server for state synchronization and new partner alerts
+  // Real-time synchronization SSE EventSource & Fallback backup polling
   useEffect(() => {
     if (!userId || !user?.groupId) return;
 
-    const pollInterval = setInterval(() => {
+    // Request desktop browser notification permissions on connect
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+
+    // Connect to SSE live feed
+    const eventSource = new EventSource(`/api/state/live?userId=${userId}`);
+
+    const handleUpdateEvent = () => {
       fetch('/api/state', {
         headers: { 'X-User-ID': userId }
       })
         .then((res) => {
-          if (!res.ok) throw new Error('Poll failed');
+          if (!res.ok) throw new Error();
           return res.json();
         })
         .then((stateData: FullHEMOState) => {
-          if (state && stateData.actions.length > state.actions.length) {
-            // Check for new partner actions (perspective: user_b is partner)
-            const newPartnerActions = stateData.actions.filter(
-              newAct => newAct.senderId === 'user_b' && !state.actions.some(oldAct => oldAct.id === newAct.id)
-            );
-            if (newPartnerActions.length > 0) {
-              const latestAction = newPartnerActions[0];
-              if (latestAction.type === 'hug') {
-                handleTriggerComfortBurst();
-                setActiveAlert({ type: 'hug', message: latestAction.message });
-              } else if (latestAction.type === 'emergency' || latestAction.type === 'comfort') {
-                setActiveAlert({ type: 'emergency', message: latestAction.message });
-              }
-            }
-          }
           setState(stateData);
         })
         .catch((err) => {
-          console.warn('Real-time sync poll failed:', err);
+          console.warn('Real-time sync refresh failed:', err);
         });
-    }, 4000);
+    };
 
-    return () => clearInterval(pollInterval);
-  }, [userId, user?.groupId, state?.actions]);
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'connected' || data.type === 'ping') {
+          return;
+        }
+
+        if (data.type === 'update') {
+          handleUpdateEvent();
+        } else if (data.type === 'notification') {
+          showLocalNotification(data.title, data.message);
+          playChime();
+          handleUpdateEvent();
+        } else if (data.type === 'hug') {
+          handleTriggerComfortBurst();
+          playChime();
+          triggerVibration();
+          setActiveAlert({ type: 'hug', message: data.message });
+          showLocalNotification('🫂 Virtual Squeeze Hug!', data.message);
+          handleUpdateEvent();
+        } else if (data.type === 'emergency' || data.type === 'comfort') {
+          playChime();
+          triggerVibration();
+          setActiveAlert({ type: 'emergency', message: data.message });
+          showLocalNotification('🚨 Urgent Companion Signal!', data.message);
+          handleUpdateEvent();
+        }
+      } catch (err) {
+        console.error('SSE Live payload parse error:', err);
+      }
+    };
+
+    eventSource.onerror = () => {
+      console.warn('SSE disconnected, falling back to background poll...');
+    };
+
+    // Keep backup interval check (slower frequency for battery optimization since SSE is active)
+    const pollInterval = setInterval(() => {
+      handleUpdateEvent();
+    }, 12000);
+
+    return () => {
+      eventSource.close();
+      clearInterval(pollInterval);
+    };
+  }, [userId, user?.groupId]);
 
   // Broadcast comfort and alert actions to partner
   const handleTriggerPartnerAction = async (type: 'hug' | 'comfort' | 'motivation' | 'call' | 'advice' | 'emergency', msg: string) => {
@@ -344,6 +431,85 @@ export default function App() {
   // Compute stats
   const totalCompletedGoals = userAGoals.filter(g => g.completed).length;
   const activeFocusStatus = userAStatus.focusMode;
+
+  // Helper to compile dynamic Partner-Only Activity Timeline (strictly viewable only by current user)
+  const compilePartnerActivityTimeline = () => {
+    const items: { type: string; title: string; detail: string; emoji: string; timestamp: string }[] = [];
+
+    // 1. Partner Mood Updates
+    if (Array.isArray(userBMoods)) {
+      userBMoods.forEach((m) => {
+        items.push({
+          type: 'Mood Log',
+          title: `Logged mood as ${m.type.replace('_', ' ')}`,
+          detail: m.note || '',
+          emoji: m.emoji || '😊',
+          timestamp: m.timestamp
+        });
+      });
+    }
+
+    // 2. Partner Presence updates
+    if (userBStatus && userBStatus.updatedAt) {
+      items.push({
+        type: 'Presence',
+        title: `Presence is now ${userBStatus.activity || 'active'}`,
+        detail: userBStatus.customStatus || 'Active',
+        emoji: '✨',
+        timestamp: userBStatus.updatedAt
+      });
+    }
+
+    // 3. Partner Sent Hugs / Actions
+    if (Array.isArray(state.actions)) {
+      state.actions
+        .filter((a) => a.senderId === 'user_b')
+        .forEach((a) => {
+          items.push({
+            type: 'Action',
+            title: 'Sent you a Hug 🫂',
+            detail: a.message,
+            emoji: '💖',
+            timestamp: a.timestamp || new Date().toISOString()
+          });
+        });
+    }
+
+    // 4. Partner Completed Goals (userBGoals)
+    if (Array.isArray(state.userBGoals)) {
+      state.userBGoals
+        .filter((g) => g.completed)
+        .forEach((g) => {
+          items.push({
+            type: 'Goal Met',
+            title: 'Completed a Goal',
+            detail: g.text,
+            emoji: '🎯',
+            timestamp: g.timestamp || new Date().toISOString()
+          });
+        });
+    }
+
+    // Sort chronologically (latest first)
+    return items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 8);
+  };
+
+  const formatRelativeTime = (isoString: string) => {
+    try {
+      const date = new Date(isoString);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return `${diffHours}h ago`;
+      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    } catch (e) {
+      return 'Recently';
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#0A0915] text-white flex flex-col md:flex-row relative overflow-hidden" id="hemo-root">
@@ -558,35 +724,53 @@ export default function App() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   
                   {/* Widget 1: How is my person today? (Accent custom color based!) */}
-                  <div className="glass-panel p-6 rounded-3xl relative overflow-hidden flex flex-col justify-between border border-indigo-500/10 min-h-[220px]">
+                  <div className="glass-panel p-6 rounded-3xl relative overflow-hidden flex flex-col justify-between border border-indigo-500/15 min-h-[220px]">
                     <div className="absolute top-0 right-0 p-3 opacity-5">
-                      <Heart className="w-24 h-24 text-indigo-400 fill-indigo-400" />
+                      <Heart className="w-24 h-24 text-pink-500 fill-pink-500" />
                     </div>
 
                     <div className="space-y-4">
                       <div className="flex justify-between items-center">
-                        <span className="text-xs font-mono uppercase tracking-widest text-indigo-400 font-bold">Partner Status</span>
-                        <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
+                        <span className="text-xs font-mono uppercase tracking-widest text-indigo-400 font-bold flex items-center gap-1.5">
+                          <Activity className="w-3.5 h-3.5 animate-pulse" />
+                          {settings.userB.nickname}'s Space
+                        </span>
+                        <div className="flex items-center gap-1.5 bg-white/3 py-1 px-2.5 rounded-full border border-white/5">
+                          <span className={`w-2 h-2 rounded-full ${userBStatus.online ? 'bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]' : 'bg-zinc-600'}`} />
+                          <span className="text-[9px] font-mono uppercase text-gray-400 font-bold">{userBStatus.online ? 'Online' : 'Offline'}</span>
+                        </div>
                       </div>
 
                       <div className="flex gap-4 items-center">
-                        <div className="w-14 h-14 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-3xl relative">
-                          🌸
+                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-pink-500/20 border border-white/10 flex items-center justify-center text-3xl relative">
+                          {userBStatus.activity === 'sleeping' ? '🌙' :
+                           userBStatus.activity === 'studying' ? '📚' :
+                           userBStatus.activity === 'working' ? '💼' :
+                           userBStatus.activity === 'eating' ? '🍲' :
+                           userBMoods[0]?.emoji || '🌸'}
                         </div>
                         <div>
-                          <h4 className="text-lg font-serif font-bold text-gray-200">{settings.userB.nickname}</h4>
-                          <span className="text-xs text-indigo-300 font-light font-serif italic">"Feeling {userBMoods[0]?.type || 'peaceful'}"</span>
+                          <h4 className="text-md font-serif font-bold text-gray-100 flex items-center gap-1.5">
+                            {settings.userB.nickname}
+                            {userBStatus.focusMode && (
+                              <span className="text-[9px] bg-purple-500/10 border border-purple-500/30 text-purple-300 font-mono py-0.5 px-1.5 rounded uppercase">Focus Mode</span>
+                            )}
+                          </h4>
+                          <span className="text-xs text-indigo-300 font-serif italic">
+                            "Feeling {userBMoods[0]?.type ? userBMoods[0].type.replace('_', ' ') : 'Aligned'} {userBMoods[0]?.emoji || '😌'}"
+                          </span>
                         </div>
                       </div>
 
-                      <p className="text-xs text-gray-400 font-light font-mono bg-white/2 p-2.5 rounded-xl border border-white/5">
-                        Current Presence: <b className="text-white">{userBStatus.customStatus || 'Hustling hard!'}</b>
-                      </p>
+                      <div className="text-xs text-gray-400 font-light font-mono bg-white/2 p-3 rounded-xl border border-white/5 flex flex-col gap-1">
+                        <span className="text-[9px] text-gray-500 uppercase tracking-wider block">Current Presence:</span>
+                        <span className="text-gray-100 font-semibold">{userBStatus.customStatus || 'Active / Free'}</span>
+                      </div>
                     </div>
 
-                    <div className="flex justify-between items-center pt-2 text-[10px] text-gray-500 font-mono">
-                      <span>Est. finish: <b>{userBStatus.estimatedFinishTime || '22:00'}</b></span>
-                      <span>Muted: {userBStatus.silentNotifications ? 'Yes 🔕' : 'No 🔔'}</span>
+                    <div className="flex justify-between items-center pt-3 text-[10px] text-gray-500 font-mono border-t border-white/5">
+                      <span>Est. finish: <b className="text-gray-300">{userBStatus.estimatedFinishTime || 'Unset'}</b></span>
+                      <span>Updated: <b className="text-indigo-400">{userBStatus.updatedAt ? formatRelativeTime(userBStatus.updatedAt) : 'Just now'}</b></span>
                     </div>
                   </div>
 
@@ -738,6 +922,62 @@ export default function App() {
 
                 </div>
 
+                {/* Row 3: Partner's Recent Activity Timeline (strictly viewable only by current user) */}
+                <div className="glass-panel p-6 rounded-3xl space-y-4 border border-indigo-500/10">
+                  <div className="flex justify-between items-center pb-2 border-b border-white/5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-pink-500/10 border border-pink-500/20 flex items-center justify-center text-sm">
+                        ⏳
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-serif font-bold text-gray-200">Recent Activity Timeline</h4>
+                        <p className="text-[10px] text-gray-400 font-light">Real-time update streams from {settings.userB.nickname}'s side</p>
+                      </div>
+                    </div>
+                    <span className="text-[9px] font-mono text-gray-500 uppercase tracking-wider bg-white/3 px-2 py-0.5 rounded border border-white/5">
+                      PAIRED STREAM
+                    </span>
+                  </div>
+
+                  {compilePartnerActivityTimeline().length === 0 ? (
+                    <div className="py-8 text-center text-xs text-gray-500 italic">
+                      No activities logged by {settings.userB.nickname} yet.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[300px] overflow-y-auto pr-1">
+                      {compilePartnerActivityTimeline().map((item, idx) => (
+                        <div
+                          key={idx}
+                          className="p-3.5 rounded-2xl bg-white/2 border border-white/5 hover:border-indigo-500/20 transition-all flex items-start gap-3.5 relative overflow-hidden group"
+                        >
+                          <div className="w-10 h-10 shrink-0 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-xl group-hover:scale-105 transition-all">
+                            {item.emoji}
+                          </div>
+
+                          <div className="flex-1 min-w-0 space-y-1 text-left">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[10px] font-mono uppercase font-bold text-indigo-400">
+                                {item.type}
+                              </span>
+                              <span className="text-[9px] font-mono text-gray-500">
+                                {formatRelativeTime(item.timestamp)}
+                              </span>
+                            </div>
+                            <h5 className="text-xs font-serif font-bold text-gray-200 truncate">
+                              {item.title}
+                            </h5>
+                            {item.detail && (
+                              <p className="text-[11px] text-gray-400 line-clamp-1 italic font-light font-serif">
+                                "{item.detail}"
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
               </div>
             )}
 
@@ -774,15 +1014,8 @@ export default function App() {
               <GoalsHabits
                 goals={userAGoals}
                 habits={habitsA}
-                onAddGoal={(g) => saveStateField('userAGoals', [g, ...userAGoals])}
-                onToggleGoal={(id) => {
-                  const updated = userAGoals.map(g => g.id === id ? { ...g, completed: !g.completed } : g);
-                  saveStateField('userAGoals', updated);
-                }}
-                onToggleHabit={(id) => {
-                  const updated = habitsA.map(h => h.id === id ? { ...h, completedToday: !h.completedToday, streak: h.completedToday ? Math.max(0, h.streak - 1) : h.streak + 1 } : h);
-                  saveStateField('habitsA', updated);
-                }}
+                onUpdateGoals={(updated) => saveStateField('userAGoals', updated)}
+                onUpdateHabits={(updated) => saveStateField('habitsA', updated)}
                 partnerName={settings.userB.nickname}
               />
             )}

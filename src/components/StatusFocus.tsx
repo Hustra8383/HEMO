@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Activity, Clock, Sliders, BellOff, Volume2, Shield, AlertTriangle } from 'lucide-react';
+import { Activity, Clock, Sliders, BellOff, Shield, Palette, Sparkles } from 'lucide-react';
 import { LiveStatus, ActivityType } from '../types';
 
 interface StatusFocusProps {
@@ -14,35 +14,44 @@ interface StatusFocusProps {
   onUpdate: (updatedStatus: LiveStatus) => void;
 }
 
-const ACTIVITIES: { type: ActivityType; label: string; emoji: string }[] = [
+const ACTIVITIES = [
   { type: 'studying', label: 'Studying', emoji: '📚' },
-  { type: 'working', label: 'Working', emoji: '💼' },
-  { type: 'eating', label: 'Eating', emoji: '🍲' },
   { type: 'sleeping', label: 'Sleeping', emoji: '🌙' },
-  { type: 'relaxing', label: 'Relaxing', emoji: '😌' },
-  { type: 'travelling', label: 'Travelling', emoji: '✈️' },
+  { type: 'atschool', label: 'At School', emoji: '🏫' },
+  { type: 'atcollege', label: 'At College', emoji: '🎓' },
+  { type: 'working', label: 'Working', emoji: '💼' },
   { type: 'busy', label: 'Busy', emoji: '🔴' },
   { type: 'free', label: 'Free', emoji: '🟢' },
+  { type: 'gaming', label: 'Gaming', emoji: '🎮' },
+  { type: 'travelling', label: 'Traveling', emoji: '✈️' },
+  { type: 'eating', label: 'Eating', emoji: '🍲' },
+  { type: 'withfamily', label: 'With Family', emoji: '👨‍👩‍👧‍👦' },
+  { type: 'watchingmovie', label: 'Watching Movie', emoji: '🎬' },
+  { type: 'exercising', label: 'Exercising', emoji: '🏋️' },
+  { type: 'shopping', label: 'Shopping', emoji: '🛍️' },
+  { type: 'relaxing', label: 'Relaxing', emoji: '😌' },
+  { type: 'reading', label: 'Reading', emoji: '📖' },
+  { type: 'custom', label: 'Custom', emoji: '✨' }
 ];
 
 export default function StatusFocus({ status, partnerName, onUpdate }: StatusFocusProps) {
-  const [activity, setActivity] = useState<ActivityType>(status.activity);
-  const [customStatus, setCustomStatus] = useState(status.customStatus);
-  const [estimatedFinishTime, setEstimatedFinishTime] = useState(status.estimatedFinishTime);
+  const [activity, setActivity] = useState<string>(status.activity);
+  const [customStatus, setCustomStatus] = useState(status.customStatus || '');
+  const [estimatedFinishTime, setEstimatedFinishTime] = useState(status.estimatedFinishTime || '');
   const [focusMode, setFocusMode] = useState(status.focusMode);
   const [silentNotifications, setSilentNotifications] = useState(status.silentNotifications);
 
-  // Focus Timer States (e.g. 25, 45, 60 mins)
+  // Focus Timer States
   const [timerDuration, setTimerDuration] = useState(45); // default 45 mins
   const [timeLeft, setTimeLeft] = useState(timerDuration * 60);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<any>(null);
 
   useEffect(() => {
     // Sync with parent state changes
     setActivity(status.activity);
-    setCustomStatus(status.customStatus);
-    setEstimatedFinishTime(status.estimatedFinishTime);
+    setCustomStatus(status.customStatus || '');
+    setEstimatedFinishTime(status.estimatedFinishTime || '');
     setFocusMode(status.focusMode);
     setSilentNotifications(status.silentNotifications);
   }, [status]);
@@ -66,7 +75,6 @@ export default function StatusFocus({ status, partnerName, onUpdate }: StatusFoc
     setFocusMode(true);
     setSilentNotifications(true);
     
-    // Automatically determine estimated finish hour
     const finish = new Date();
     finish.setMinutes(finish.getMinutes() + timerDuration);
     const finishStr = `${String(finish.getHours()).padStart(2, '0')}:${String(finish.getMinutes()).padStart(2, '0')}`;
@@ -100,7 +108,7 @@ export default function StatusFocus({ status, partnerName, onUpdate }: StatusFoc
 
   const handleSaveStandardStatus = () => {
     onUpdate({
-      activity,
+      activity: activity as ActivityType,
       customStatus,
       estimatedFinishTime,
       focusMode,
@@ -116,8 +124,7 @@ export default function StatusFocus({ status, partnerName, onUpdate }: StatusFoc
   };
 
   return (
-    <div className="space-y-6">
-      {/* Active Focus Mode View */}
+    <div className="space-y-6" id="status-focus-container">
       <AnimatePresence mode="wait">
         {focusMode ? (
           <motion.div
@@ -137,7 +144,6 @@ export default function StatusFocus({ status, partnerName, onUpdate }: StatusFoc
               Notifications silenced. {partnerName} sees: <span className="text-pink-400">"Don't disturb. Currently building dreams."</span>
             </p>
 
-            {/* Countdown circular style */}
             <div className="flex flex-col items-center justify-center my-6">
               <div className="relative w-44 h-44 flex items-center justify-center rounded-full bg-white/2 border-4 border-purple-500/20 shadow-inner">
                 <div className="absolute inset-2 rounded-full border border-dashed border-purple-500/30 animate-spin" style={{ animationDuration: '30s' }} />
@@ -165,78 +171,87 @@ export default function StatusFocus({ status, partnerName, onUpdate }: StatusFoc
             className="grid grid-cols-1 md:grid-cols-2 gap-6"
           >
             {/* Left: Quick Status updater */}
-            <div className="glass-panel p-6 rounded-3xl space-y-5">
-              <div className="flex items-center gap-2 mb-2">
-                <Activity className="w-5 h-5 text-pink-400" />
-                <h3 className="text-lg font-serif font-bold">Update Current Presence</h3>
-              </div>
-
-              <div>
-                <label className="text-[10px] uppercase tracking-wider text-gray-400 block mb-2 font-medium">What are you doing?</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {ACTIVITIES.map((act) => (
-                    <button
-                      key={act.type}
-                      onClick={() => setActivity(act.type)}
-                      className={`p-2.5 rounded-xl transition-all text-sm flex flex-col items-center justify-center gap-1 ${
-                        activity === act.type
-                          ? 'bg-pink-500/20 border border-pink-500/40 text-white'
-                          : 'bg-white/5 border border-white/5 text-gray-400 hover:bg-white/10'
-                      }`}
-                    >
-                      <span className="text-lg">{act.emoji}</span>
-                      <span className="text-[9px] font-light truncate w-full text-center">{act.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
+            <div className="glass-panel p-6 rounded-3xl space-y-5 flex flex-col justify-between">
               <div className="space-y-4">
-                <div>
-                  <label className="text-[10px] uppercase tracking-wider text-gray-400 block mb-1.5 font-medium">Custom Status Detail</label>
-                  <input
-                    type="text"
-                    value={customStatus}
-                    onChange={(e) => setCustomStatus(e.target.value)}
-                    placeholder="e.g. Solving Chemistry Module 3..."
-                    className="w-full p-3 rounded-xl glass-input text-sm text-white"
-                  />
+                <div className="flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-pink-400 animate-pulse" />
+                  <h3 className="text-lg font-serif font-bold">Set Current Presence</h3>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-gray-400 block mb-2 font-medium">Select your activity</label>
+                  <div className="grid grid-cols-4 gap-2 max-h-[190px] overflow-y-auto pr-1">
+                    {ACTIVITIES.map((act) => (
+                      <button
+                        key={act.type}
+                        onClick={() => {
+                          setActivity(act.type);
+                          if (act.type !== 'custom') {
+                            setCustomStatus('');
+                          }
+                        }}
+                        className={`p-2 rounded-xl transition-all text-xs flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                          activity === act.type
+                            ? 'bg-gradient-to-br from-pink-500/20 to-indigo-500/20 border border-pink-500/40 text-white'
+                            : 'bg-white/5 border border-white/5 text-gray-400 hover:bg-white/10'
+                        }`}
+                      >
+                        <span className="text-lg">{act.emoji}</span>
+                        <span className="text-[9px] font-light truncate w-full text-center">{act.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-3.5">
                   <div>
-                    <label className="text-[10px] uppercase tracking-wider text-gray-400 block mb-1.5 font-medium">Est. Finish Hour</label>
-                    <div className="relative">
-                      <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="text"
-                        value={estimatedFinishTime}
-                        onChange={(e) => setEstimatedFinishTime(e.target.value)}
-                        placeholder="e.g. 19:30"
-                        className="w-full p-3 pl-9 rounded-xl glass-input text-sm text-white"
-                      />
-                    </div>
+                    <label className="text-[10px] uppercase tracking-wider text-gray-400 block mb-1.5 font-medium">
+                      {activity === 'custom' ? 'Custom Status Text *' : 'Status Description (Optional)'}
+                    </label>
+                    <input
+                      type="text"
+                      value={customStatus}
+                      onChange={(e) => setCustomStatus(e.target.value)}
+                      placeholder={activity === 'custom' ? 'e.g. Baking fresh cookies 🍪' : 'e.g. Solving math homework...'}
+                      className="w-full p-3 rounded-xl glass-input text-xs text-white"
+                    />
                   </div>
 
-                  <div className="flex flex-col justify-end">
-                    <button
-                      onClick={() => setSilentNotifications(!silentNotifications)}
-                      className={`p-3 rounded-xl text-xs font-medium border transition-all flex items-center justify-center gap-2 ${
-                        silentNotifications
-                          ? 'bg-amber-500/20 border-amber-500/40 text-amber-200'
-                          : 'bg-white/5 border-white/5 text-gray-400 hover:bg-white/10'
-                      }`}
-                    >
-                      <BellOff className="w-4 h-4" />
-                      {silentNotifications ? 'Muted' : 'Unmuted'}
-                    </button>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] uppercase tracking-wider text-gray-400 block mb-1.5 font-medium">Est. Finish</label>
+                      <div className="relative">
+                        <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                        <input
+                          type="text"
+                          value={estimatedFinishTime}
+                          onChange={(e) => setEstimatedFinishTime(e.target.value)}
+                          placeholder="e.g. 19:30"
+                          className="w-full p-3 pl-9 rounded-xl glass-input text-xs text-white font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col justify-end">
+                      <button
+                        onClick={() => setSilentNotifications(!silentNotifications)}
+                        className={`p-3 rounded-xl text-xs font-medium border transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                          silentNotifications
+                            ? 'bg-amber-500/20 border-amber-500/40 text-amber-200'
+                            : 'bg-white/5 border-white/5 text-gray-400 hover:bg-white/10'
+                        }`}
+                      >
+                        <BellOff className="w-4 h-4 text-amber-400" />
+                        {silentNotifications ? 'Muted' : 'Mute Alerts'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
 
               <button
                 onClick={handleSaveStandardStatus}
-                className="w-full py-3 bg-white text-black font-semibold rounded-xl text-xs tracking-wider hover:bg-gray-100 transition-all cursor-pointer"
+                className="w-full py-3 bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-400 hover:to-indigo-500 text-white font-semibold rounded-xl text-xs tracking-wider transition-all cursor-pointer shadow-md"
               >
                 Broadcast Active Status
               </button>
@@ -254,7 +269,7 @@ export default function StatusFocus({ status, partnerName, onUpdate }: StatusFoc
                   <h3 className="text-lg font-serif font-bold">Deep Focus Mode</h3>
                 </div>
                 <p className="text-xs text-gray-400 font-light leading-relaxed">
-                  Lock into single-task deep learning or project building. Silent all incoming pings, notify {partnerName}, and showcase real-time commitment to our dream timelines.
+                  Lock into single-task deep learning or project building. Silences all incoming pings, notifies {partnerName}, and showcases real-time commitment to our dream timelines.
                 </p>
 
                 <div>
@@ -267,7 +282,7 @@ export default function StatusFocus({ status, partnerName, onUpdate }: StatusFoc
                           setTimerDuration(dur);
                           setTimeLeft(dur * 60);
                         }}
-                        className={`py-2.5 rounded-xl text-xs font-mono font-medium border transition-all ${
+                        className={`py-2.5 rounded-xl text-xs font-mono font-medium border transition-all cursor-pointer ${
                           timerDuration === dur
                             ? 'bg-purple-500/20 border-purple-500/50 text-purple-200'
                             : 'bg-white/5 border-white/5 text-gray-400 hover:bg-white/10'

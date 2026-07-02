@@ -13,7 +13,14 @@ export type MoodType =
   | 'angry'
   | 'missing_you'
   | 'loved'
-  | 'grateful';
+  | 'grateful'
+  | 'excited'
+  | 'sleepy'
+  | 'lonely'
+  | 'anxious'
+  | 'moody'
+  | 'overwhelmed'
+  | 'custom';
 
 export interface Mood {
   type: MoodType;
@@ -39,6 +46,10 @@ export interface LiveStatus {
   focusMode: boolean;
   silentNotifications: boolean;
   updatedAt: string;
+  feeling?: string;
+  feelingEmoji?: string;
+  feelingUpdatedAt?: string;
+  online?: boolean;
 }
 
 export type CheckInType =
@@ -69,6 +80,9 @@ export interface Goal {
   category: 'general' | 'study' | 'work' | 'dream';
   completed: boolean;
   timestamp: string;
+  color?: string;
+  icon?: string;
+  reminderTime?: string;
 }
 
 export interface Habit {
@@ -78,6 +92,16 @@ export interface Habit {
   streak: number;
   completedToday: boolean;
   history: string[]; // dates of completion (YYYY-MM-DD)
+  color?: string;
+  reminderTime?: string;
+}
+
+export interface ActivityTimelineItem {
+  id: string;
+  uploaderId: string;
+  text: string;
+  emoji: string;
+  timestamp: string;
 }
 
 export interface Memory {
@@ -207,4 +231,5 @@ export interface FullHEMOState {
   milestones: RelationshipMilestone[];
   memes: Meme[];
   reflections: NightReflection[];
+  activityTimeline?: ActivityTimelineItem[];
 }

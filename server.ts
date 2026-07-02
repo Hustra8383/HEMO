@@ -111,6 +111,24 @@ const saveDB = () => {
 // Initial load
 loadDB();
 
+// Active SSE clients map
+const clients = new Map<string, any>(); // userId -> Express Response object
+
+// Realtime notification helper
+const notifyPartner = (groupId: string, senderId: string, payload: any) => {
+  const group = db.groups[groupId];
+  if (!group) return;
+  const partnerId = group.settings.userA.id === senderId ? group.settings.userB.id : group.settings.userA.id;
+  const partnerRes = clients.get(partnerId);
+  if (partnerRes) {
+    try {
+      partnerRes.write(`data: ${JSON.stringify(payload)}\n\n`);
+    } catch (err) {
+      console.error('Failed writing to partner SSE:', err);
+    }
+  }
+};
+
 // Helper to create empty group state (No demo data loaded anywhere!)
 const createEmptyGroupState = (userA: Profile, userB: Profile): FullHEMOState => {
   return {
@@ -153,6 +171,7 @@ const createEmptyGroupState = (userA: Profile, userB: Profile): FullHEMOState =>
     milestones: [],
     memes: [],
     reflections: [],
+    activityTimeline: [],
   };
 };
 
@@ -167,6 +186,14 @@ const mapStateForUser = (groupState: FullHEMOState, userId: string): FullHEMOSta
         ...groupState.settings,
         userA: { ...groupState.settings.userA, id: 'user_a' },
         userB: { ...groupState.settings.userB, id: 'user_b' }
+      },
+      userAStatus: {
+        ...groupState.userAStatus,
+        online: clients.has(groupState.settings.userA.id)
+      },
+      userBStatus: {
+        ...groupState.userBStatus,
+        online: clients.has(groupState.settings.userB.id)
       },
       memories: groupState.memories.map(m => ({
         ...m,
@@ -198,6 +225,10 @@ const mapStateForUser = (groupState: FullHEMOState, userId: string): FullHEMOSta
       reflections: groupState.reflections.map(r => ({
         ...r,
         completedBy: r.completedBy === userId ? 'user_a' : 'user_b'
+      })),
+      activityTimeline: (groupState.activityTimeline || []).map(item => ({
+        ...item,
+        uploaderId: item.uploaderId === userId ? 'user_a' : 'user_b'
       }))
     };
   }
@@ -212,8 +243,14 @@ const mapStateForUser = (groupState: FullHEMOState, userId: string): FullHEMOSta
     },
     userAMoods: groupState.userBMoods,
     userBMoods: groupState.userAMoods,
-    userAStatus: groupState.userBStatus,
-    userBStatus: groupState.userAStatus,
+    userAStatus: {
+      ...groupState.userBStatus,
+      online: clients.has(groupState.settings.userB.id)
+    },
+    userBStatus: {
+      ...groupState.userAStatus,
+      online: clients.has(groupState.settings.userA.id)
+    },
     userACheckIns: groupState.userBCheckIns,
     userBCheckIns: groupState.userACheckIns,
     userAGoals: groupState.userBGoals,
@@ -260,6 +297,10 @@ const mapStateForUser = (groupState: FullHEMOState, userId: string): FullHEMOSta
     reflections: groupState.reflections.map(r => ({
       ...r,
       completedBy: r.completedBy === userId ? 'user_a' : 'user_b'
+    })),
+    activityTimeline: (groupState.activityTimeline || []).map(item => ({
+      ...item,
+      uploaderId: item.uploaderId === userId ? 'user_a' : 'user_b'
     })),
   };
   return swapped;
@@ -425,6 +466,71 @@ app.get('/api/state', (req, res) => {
   res.json(mapStateForUser(groupState, user.id));
 });
 
+// SSE Live Connection for real-time state synchronization
+app.get('/api/state/live', (req, res) => {
+  const userId = req.query.userId as string;
+  if (!userId || !db.users[userId]) {
+    return res.status(401).send('Unauthorized');
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  clients.set(userId, res);
+
+  // Send initial connection confirmation
+  res.write(`data: ${JSON.stringify({ type: 'connected' })}\n\n`);
+
+  // Periodic ping to keep Cloud Run container connection alive (prevents idle timeout)
+  const pingInterval = setInterval(() => {
+    try {
+      res.write(`data: ${JSON.stringify({ type: 'ping' })}\n\n`);
+    } catch (err) {
+      // Connection closed/unreachable
+    }
+  }, 25000);
+
+  // Notify partner that user has joined (online status changed)
+  const user = db.users[userId];
+  if (user && user.groupId) {
+    const group = db.groups[user.groupId];
+    if (group) {
+      const partnerId = group.settings.userA.id === userId ? group.settings.userB.id : group.settings.userA.id;
+      const partnerRes = clients.get(partnerId);
+      if (partnerRes) {
+        try {
+          partnerRes.write(`data: ${JSON.stringify({ type: 'update' })}\n\n`);
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+  }
+
+  req.on('close', () => {
+    clearInterval(pingInterval);
+    clients.delete(userId);
+
+    // Notify partner that user has left (offline status changed)
+    if (user && user.groupId) {
+      const group = db.groups[user.groupId];
+      if (group) {
+        const partnerId = group.settings.userA.id === userId ? group.settings.userB.id : group.settings.userA.id;
+        const partnerRes = clients.get(partnerId);
+        if (partnerRes) {
+          try {
+            partnerRes.write(`data: ${JSON.stringify({ type: 'update' })}\n\n`);
+          } catch (e) {
+            // ignore
+          }
+        }
+      }
+    }
+  });
+});
+
 // 7. Update specific companion state fields
 app.post('/api/state', (req, res) => {
   const user = getAuthenticatedUser(req);
@@ -515,6 +621,11 @@ app.post('/api/state', (req, res) => {
           ...r,
           completedBy: r.completedBy === 'user_a' ? groupState.settings.userA.id : groupState.settings.userB.id
         }));
+      } else if (key === 'activityTimeline') {
+        groupState.activityTimeline = value.map((item: any) => ({
+          ...item,
+          uploaderId: item.uploaderId === 'user_a' ? groupState.settings.userA.id : groupState.settings.userB.id
+        }));
       }
     } else {
       // For User B, swap perspective back
@@ -595,10 +706,47 @@ app.post('/api/state', (req, res) => {
           ...r,
           completedBy: r.completedBy === 'user_a' ? user.id : groupState.settings.userA.id
         }));
+      } else if (key === 'activityTimeline') {
+        groupState.activityTimeline = value.map((item: any) => ({
+          ...item,
+          uploaderId: item.uploaderId === 'user_a' ? user.id : groupState.settings.userA.id
+        }));
       }
     }
 
     saveDB();
+
+    // Notify partner of state change
+    notifyPartner(user.groupId, user.id, { type: 'update' });
+
+    // Send instant events/notifications
+    if (key === 'actions' && Array.isArray(value) && value.length > 0) {
+      const latestAction = value[0];
+      if (latestAction && !latestAction.acknowledged) {
+        notifyPartner(user.groupId, user.id, {
+          type: latestAction.type,
+          message: latestAction.message,
+          actionId: latestAction.id
+        });
+      }
+    } else if (key === 'userAStatus' || key === 'userBStatus') {
+      const statusVal = value;
+      const nickname = user.nickname || 'Your partner';
+      notifyPartner(user.groupId, user.id, {
+        type: 'notification',
+        title: 'Presence Update',
+        message: `${nickname} is now ${statusVal.activity || 'active'}${statusVal.customStatus ? ` (${statusVal.customStatus})` : ''}`
+      });
+    } else if ((key === 'userAMoods' || key === 'userBMoods') && Array.isArray(value) && value.length > 0) {
+      const latestMood = value[0];
+      const nickname = user.nickname || 'Your partner';
+      notifyPartner(user.groupId, user.id, {
+        type: 'notification',
+        title: 'Mood Update',
+        message: `${nickname} is feeling ${latestMood.type.replace('_', ' ')} ${latestMood.emoji}`
+      });
+    }
+
     res.json({ success: true, updatedKey: key });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Error updating state' });
