@@ -65,6 +65,8 @@ export default function App() {
   // Active Alert Overlay (Booster or Emergency)
   const [activeAlert, setActiveAlert] = useState<{ type: string; message: string } | null>(null);
 
+  const partnerState = usePartnerState(state);
+
   // Fetch auth and state dynamically based on user session
   useEffect(() => {
     const storedUserId = localStorage.getItem('hemo_userId');
@@ -337,7 +339,6 @@ export default function App() {
     );
   }
 
-  const partnerState = usePartnerState(state);
   const { settings, userAMoods, userBMoods, userAStatus, userBStatus, userACheckIns, userBCheckIns, userAGoals, habitsA, memories, voiceNotes, twists, dreams, capsules, milestones, memes, reflections } = state;
 
   // Compute stats
