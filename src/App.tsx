@@ -51,6 +51,7 @@ import TwistOfTheDay from './components/TwistOfTheDay';
 import NightReflections from './components/NightReflection';
 import NeedYou from './components/NeedYou';
 import Settings from './components/Settings';
+import WidgetDashboard from './components/WidgetDashboard';
 
 export default function App() {
   const [loading, setLoading] = useState(true);
@@ -259,6 +260,21 @@ export default function App() {
         } else if (data.type === 'notification') {
           showLocalNotification(data.title, data.message);
           playChime();
+          handleUpdateEvent();
+        } else if (data.type === 'missyou') {
+          showLocalNotification(data.title || 'Miss You ❤️', data.message);
+          playChime();
+          triggerVibration();
+          handleUpdateEvent();
+        } else if (data.type === 'quickreaction') {
+          showLocalNotification(data.title || 'Love Reaction', data.message);
+          playChime();
+          triggerVibration();
+          handleUpdateEvent();
+        } else if (data.type === 'privatenote') {
+          showLocalNotification(data.title || 'Private Note 📝', data.message);
+          playChime();
+          triggerVibration();
           handleUpdateEvent();
         } else if (data.type === 'hug') {
           handleTriggerComfortBurst();
@@ -684,301 +700,15 @@ export default function App() {
           >
             {/* Tab Controller Switch */}
             {activeTab === 'home' && (
-              <div className="space-y-6" id="home-view">
-                
-                {/* Greeting Header block */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                  <div>
-                    <h2 className="font-serif text-3xl font-bold tracking-tight mb-1 text-gray-100">
-                      Welcome, <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-indigo-400">{settings.userA.nickname}</span>
-                    </h2>
-                    <p className="text-xs text-gray-400 font-light font-mono uppercase tracking-wider">
-                      Private Companion Sanctuary • Secured Alignment
-                    </p>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setActiveTab('status')}
-                      className={`py-2 px-4 rounded-xl text-xs font-semibold tracking-wide border transition-all flex items-center gap-1.5 ${
-                        activeFocusStatus
-                          ? 'bg-purple-500/20 border-purple-500/50 text-purple-200'
-                          : 'bg-white/5 border-white/10 hover:bg-white/10 text-white'
-                      }`}
-                    >
-                      <span className={`w-2 h-2 rounded-full ${activeFocusStatus ? 'bg-purple-400 animate-ping' : 'bg-emerald-500'}`} />
-                      {activeFocusStatus ? 'Focus Sprint Active' : 'Normal State'}
-                    </button>
-
-                    <button
-                      onClick={() => setActiveTab('calm')}
-                      className="py-2 px-4 rounded-xl text-xs font-semibold tracking-wide bg-gradient-to-r from-pink-500 to-indigo-600 hover:shadow-lg transition-all text-white flex items-center gap-1.5"
-                    >
-                      <Wind className="w-4 h-4 animate-spin" style={{ animationDuration: '6s' }} />
-                      Breathing room
-                    </button>
-                  </div>
-                </div>
-
-                {/* Main Dashboard Widget Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  
-                  {/* Widget 1: How is my person today? (Accent custom color based!) */}
-                  <div className="glass-panel p-6 rounded-3xl relative overflow-hidden flex flex-col justify-between border border-indigo-500/15 min-h-[220px]">
-                    <div className="absolute top-0 right-0 p-3 opacity-5">
-                      <Heart className="w-24 h-24 text-pink-500 fill-pink-500" />
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-mono uppercase tracking-widest text-indigo-400 font-bold flex items-center gap-1.5">
-                          <Activity className="w-3.5 h-3.5 animate-pulse" />
-                          {settings.userB.nickname}'s Space
-                        </span>
-                        <div className="flex items-center gap-1.5 bg-white/3 py-1 px-2.5 rounded-full border border-white/5">
-                          <span className={`w-2 h-2 rounded-full ${userBStatus.online ? 'bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]' : 'bg-zinc-600'}`} />
-                          <span className="text-[9px] font-mono uppercase text-gray-400 font-bold">{userBStatus.online ? 'Online' : 'Offline'}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-4 items-center">
-                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-pink-500/20 border border-white/10 flex items-center justify-center text-3xl relative">
-                          {userBStatus.activity === 'sleeping' ? '🌙' :
-                           userBStatus.activity === 'studying' ? '📚' :
-                           userBStatus.activity === 'working' ? '💼' :
-                           userBStatus.activity === 'eating' ? '🍲' :
-                           userBMoods[0]?.emoji || '🌸'}
-                        </div>
-                        <div>
-                          <h4 className="text-md font-serif font-bold text-gray-100 flex items-center gap-1.5">
-                            {settings.userB.nickname}
-                            {userBStatus.focusMode && (
-                              <span className="text-[9px] bg-purple-500/10 border border-purple-500/30 text-purple-300 font-mono py-0.5 px-1.5 rounded uppercase">Focus Mode</span>
-                            )}
-                          </h4>
-                          <span className="text-xs text-indigo-300 font-serif italic">
-                            "Feeling {userBMoods[0]?.type ? userBMoods[0].type.replace('_', ' ') : 'Aligned'} {userBMoods[0]?.emoji || '😌'}"
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="text-xs text-gray-400 font-light font-mono bg-white/2 p-3 rounded-xl border border-white/5 flex flex-col gap-1">
-                        <span className="text-[9px] text-gray-500 uppercase tracking-wider block">Current Presence:</span>
-                        <span className="text-gray-100 font-semibold">{userBStatus.customStatus || 'Active / Free'}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-between items-center pt-3 text-[10px] text-gray-500 font-mono border-t border-white/5">
-                      <span>Est. finish: <b className="text-gray-300">{userBStatus.estimatedFinishTime || 'Unset'}</b></span>
-                      <span>Updated: <b className="text-indigo-400">{userBStatus.updatedAt ? formatRelativeTime(userBStatus.updatedAt) : 'Just now'}</b></span>
-                    </div>
-                  </div>
-
-                  {/* Widget 2: Streak & Quick Stats */}
-                  <div className="glass-panel p-6 rounded-3xl relative overflow-hidden flex flex-col justify-between border border-pink-500/10 min-h-[220px]">
-                    <div className="absolute top-[-20%] right-[-20%] w-32 h-32 bg-pink-500/5 rounded-full" />
-
-                    <div className="space-y-3">
-                      <span className="text-xs font-mono uppercase tracking-widest text-pink-400 font-bold">Streaks & Progress</span>
-                      
-                      <div className="flex items-center gap-3">
-                        <div className="p-3 bg-pink-500/10 rounded-2xl">
-                          <Flame className="w-6 h-6 text-pink-500 animate-bounce" />
-                        </div>
-                        <div>
-                          <span className="text-3xl font-mono font-bold tracking-tight">
-                            {(() => {
-                              const start = settings.relationshipStartDate || new Date().toISOString().split('T')[0];
-                              const diffDays = Math.max(1, Math.floor(Math.abs(Date.now() - new Date(start).getTime()) / (1000 * 60 * 60 * 24)));
-                              return `${diffDays} days`;
-                            })()}
-                          </span>
-                          <span className="text-[10px] text-gray-400 block font-mono uppercase">Consecutive Aligned Connection</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5 pt-2">
-                      <div className="flex justify-between text-[11px] text-gray-400">
-                        <span>Daily Goals complete:</span>
-                        <span className="font-mono text-white font-bold">{totalCompletedGoals} / {userAGoals.length}</span>
-                      </div>
-                      <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
-                        <div className="bg-gradient-to-r from-pink-500 to-indigo-500 h-full rounded-full" style={{ width: `${userAGoals.length > 0 ? (totalCompletedGoals / userAGoals.length) * 100 : 50}%` }} />
-                      </div>
-                    </div>
-
-                    <span className="text-[8px] font-mono text-gray-500 uppercase tracking-widest block text-center mt-2">
-                      Continuous progress fuels big ambitions
-                    </span>
-                  </div>
-
-                  {/* Widget 3: Live countdown or Target exam clock */}
-                  <div className="glass-panel p-6 rounded-3xl flex flex-col justify-between min-h-[220px] relative overflow-hidden">
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-mono uppercase tracking-widest text-indigo-400 font-bold">Countdown Clock</span>
-                        <Calendar className="w-4 h-4 text-indigo-400" />
-                      </div>
-
-                      {dreams.filter(d => d.type === 'countdown').length > 0 ? (
-                        (() => {
-                          const countdownCard = dreams.filter(d => d.type === 'countdown')[0];
-                          return (
-                            <>
-                              <div>
-                                <h4 className="text-md font-serif font-semibold text-gray-100">{countdownCard.title}</h4>
-                                <p className="text-xs text-gray-400 font-light mt-1">{countdownCard.description}</p>
-                              </div>
-                              <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl flex justify-between items-center text-xs">
-                                <span className="text-indigo-300 font-mono font-bold">{countdownCard.value}</span>
-                                <span className="text-[10px] text-gray-500 font-mono uppercase">Target Goal</span>
-                              </div>
-                            </>
-                          );
-                        })()
-                      ) : (
-                        <>
-                          <div>
-                            <h4 className="text-md font-serif font-semibold text-gray-100">No Countdown Active</h4>
-                            <p className="text-xs text-gray-400 font-light mt-1">Pin a countdown card to your Dream Board to display real-time connection targets here.</p>
-                          </div>
-                          <button
-                            onClick={() => setActiveTab('dreams')}
-                            className="p-3 bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 rounded-2xl text-center text-xs font-semibold text-indigo-300 transition-all cursor-pointer"
-                          >
-                            Add Countdown Card ➔
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* Row 2: Anchor memory block preview and Quick Connection Signals */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  
-                  {/* Visual memory slider */}
-                  <div className="glass-panel p-6 rounded-3xl space-y-4">
-                    <div className="flex justify-between items-center">
-                      <h4 className="text-sm font-serif font-bold text-gray-200">Latest Anchored Memory</h4>
-                      <button onClick={() => setActiveTab('memories')} className="text-xs text-pink-400 hover:underline">Vault</button>
-                    </div>
-
-                    {memories.length > 0 ? (
-                      <div className="relative rounded-2xl overflow-hidden h-44 group">
-                        <img
-                          src={memories[0].url}
-                          alt="Anchored memory preview"
-                          className="w-full h-full object-cover filter brightness-[0.7] group-hover:scale-102 transition-all duration-500"
-                          referrerPolicy="no-referrer"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-transparent to-transparent p-4 flex flex-col justify-end">
-                          <p className="text-sm text-gray-200 font-serif font-light">"{memories[0].caption}"</p>
-                          <span className="text-[10px] font-mono text-gray-500 mt-1 uppercase">
-                            {new Date(memories[0].timestamp).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </span>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-gray-500 italic py-6">No visual memories saved yet.</p>
-                    )}
-                  </div>
-
-                  {/* Direct Need You panel action shortcuts */}
-                  <div className="glass-panel p-6 rounded-3xl space-y-4 flex flex-col justify-between">
-                    <div>
-                      <h4 className="text-sm font-serif font-bold text-gray-200">Private Companion Actions</h4>
-                      <p className="text-xs text-gray-400 font-light mt-1">Instantly squeeze a private virtual hug or signal for urgent advice.</p>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 pt-2">
-                      <button
-                        onClick={() => {
-                          handleTriggerComfortBurst();
-                          handleTriggerPartnerAction('hug', `${settings.userA.nickname} sent you an instant Virtual Hug! 🫂💖`);
-                        }}
-                        className="py-3 px-4 bg-pink-500/20 hover:bg-pink-500/35 border border-pink-500/30 text-pink-200 rounded-2xl text-xs font-semibold transition-all cursor-pointer"
-                      >
-                        Squeeze Hug 🫂
-                      </button>
-
-                      <button
-                        onClick={() => setActiveTab('capsules')}
-                        className="py-3 px-4 bg-indigo-500/20 hover:bg-indigo-500/35 border border-indigo-500/30 text-indigo-200 rounded-2xl text-xs font-semibold transition-all cursor-pointer"
-                      >
-                        Time Lock Box 🔒
-                      </button>
-                    </div>
-
-                    <button
-                      onClick={() => setActiveTab('settings')}
-                      className="w-full py-2.5 bg-white/5 border border-white/10 hover:bg-white/10 text-white rounded-xl text-xs font-mono font-bold uppercase transition-all"
-                    >
-                      Configuration Settings
-                    </button>
-                  </div>
-
-                </div>
-
-                {/* Row 3: Partner's Recent Activity Timeline (strictly viewable only by current user) */}
-                <div className="glass-panel p-6 rounded-3xl space-y-4 border border-indigo-500/10">
-                  <div className="flex justify-between items-center pb-2 border-b border-white/5">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-pink-500/10 border border-pink-500/20 flex items-center justify-center text-sm">
-                        ⏳
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-serif font-bold text-gray-200">Recent Activity Timeline</h4>
-                        <p className="text-[10px] text-gray-400 font-light">Real-time update streams from {settings.userB.nickname}'s side</p>
-                      </div>
-                    </div>
-                    <span className="text-[9px] font-mono text-gray-500 uppercase tracking-wider bg-white/3 px-2 py-0.5 rounded border border-white/5">
-                      PAIRED STREAM
-                    </span>
-                  </div>
-
-                  {compilePartnerActivityTimeline().length === 0 ? (
-                    <div className="py-8 text-center text-xs text-gray-500 italic">
-                      No activities logged by {settings.userB.nickname} yet.
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[300px] overflow-y-auto pr-1">
-                      {compilePartnerActivityTimeline().map((item, idx) => (
-                        <div
-                          key={idx}
-                          className="p-3.5 rounded-2xl bg-white/2 border border-white/5 hover:border-indigo-500/20 transition-all flex items-start gap-3.5 relative overflow-hidden group"
-                        >
-                          <div className="w-10 h-10 shrink-0 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-xl group-hover:scale-105 transition-all">
-                            {item.emoji}
-                          </div>
-
-                          <div className="flex-1 min-w-0 space-y-1 text-left">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-[10px] font-mono uppercase font-bold text-indigo-400">
-                                {item.type}
-                              </span>
-                              <span className="text-[9px] font-mono text-gray-500">
-                                {formatRelativeTime(item.timestamp)}
-                              </span>
-                            </div>
-                            <h5 className="text-xs font-serif font-bold text-gray-200 truncate">
-                              {item.title}
-                            </h5>
-                            {item.detail && (
-                              <p className="text-[11px] text-gray-400 line-clamp-1 italic font-light font-serif">
-                                "{item.detail}"
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-              </div>
+              <WidgetDashboard
+                state={state}
+                userId={userId!}
+                saveStateField={saveStateField}
+                playChime={playChime}
+                triggerVibration={triggerVibration}
+                showLocalNotification={showLocalNotification}
+                setActiveTab={setActiveTab}
+              />
             )}
 
             {activeTab === 'status' && (

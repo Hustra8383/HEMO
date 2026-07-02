@@ -210,6 +210,88 @@ export interface CompanionState {
   relationshipGoals: string[];
 }
 
+export interface MissYouLog {
+  id: string;
+  senderId: string;
+  timestamp: string;
+}
+
+export interface QuickReaction {
+  id: string;
+  senderId: string;
+  emoji: string;
+  label: string;
+  timestamp: string;
+}
+
+export interface DailyMemory {
+  id: string;
+  photoUrl: string;
+  caption: string;
+  shortMemory: string;
+  date: string; // YYYY-MM-DD
+  uploaderId: string;
+}
+
+export interface SharedCountdown {
+  id: string;
+  title: string;
+  targetDate: string; // YYYY-MM-DD
+  category: 'anniversary' | 'birthday' | 'date' | 'festival' | 'trip' | 'custom';
+}
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  date: string; // YYYY-MM-DD
+  type: 'date_night' | 'birthday' | 'exam' | 'event' | 'meetup' | 'appointment';
+  description: string;
+  createdBy: string;
+}
+
+export interface PrivateNote {
+  id: string;
+  text: string;
+  senderId: string;
+  timestamp: string;
+}
+
+export interface BucketItem {
+  id: string;
+  title: string;
+  completed: boolean;
+  category: string;
+  completedAt?: string;
+}
+
+export interface LocationState {
+  enabled: boolean;
+  lat?: number;
+  lng?: number;
+  address?: string;
+  updatedAt?: string;
+}
+
+export interface VaultPhoto {
+  id: string;
+  url: string; // Base64
+  caption?: string;
+  album: string; // album name
+  isFavorite: boolean;
+  timestamp: string;
+  uploaderId: string;
+}
+
+export interface JournalEntry {
+  id: string;
+  title: string;
+  content: string;
+  mood?: string;
+  timestamp: string;
+  authorId: string;
+  reactions: string[]; // user IDs who reacted with heart
+}
+
 export interface FullHEMOState {
   settings: CompanionState;
   userAMoods: Mood[];
@@ -232,4 +314,15 @@ export interface FullHEMOState {
   memes: Meme[];
   reflections: NightReflection[];
   activityTimeline?: ActivityTimelineItem[];
+  missYouHistory?: MissYouLog[];
+  quickReactionsHistory?: QuickReaction[];
+  dailyMemories?: DailyMemory[];
+  countdowns?: SharedCountdown[];
+  calendarEvents?: CalendarEvent[];
+  privateNotes?: PrivateNote[];
+  bucketList?: BucketItem[];
+  liveLocationA?: LocationState;
+  liveLocationB?: LocationState;
+  photoVault?: VaultPhoto[];
+  journalEntries?: JournalEntry[];
 }

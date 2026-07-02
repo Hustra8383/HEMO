@@ -172,6 +172,17 @@ const createEmptyGroupState = (userA: Profile, userB: Profile): FullHEMOState =>
     memes: [],
     reflections: [],
     activityTimeline: [],
+    missYouHistory: [],
+    quickReactionsHistory: [],
+    dailyMemories: [],
+    countdowns: [],
+    calendarEvents: [],
+    privateNotes: [],
+    bucketList: [],
+    liveLocationA: { enabled: false },
+    liveLocationB: { enabled: false },
+    photoVault: [],
+    journalEntries: []
   };
 };
 
@@ -229,6 +240,39 @@ const mapStateForUser = (groupState: FullHEMOState, userId: string): FullHEMOSta
       activityTimeline: (groupState.activityTimeline || []).map(item => ({
         ...item,
         uploaderId: item.uploaderId === userId ? 'user_a' : 'user_b'
+      })),
+      missYouHistory: (groupState.missYouHistory || []).map(m => ({
+        ...m,
+        senderId: m.senderId === userId ? 'user_a' : 'user_b'
+      })),
+      quickReactionsHistory: (groupState.quickReactionsHistory || []).map(q => ({
+        ...q,
+        senderId: q.senderId === userId ? 'user_a' : 'user_b'
+      })),
+      dailyMemories: (groupState.dailyMemories || []).map(d => ({
+        ...d,
+        uploaderId: d.uploaderId === userId ? 'user_a' : 'user_b'
+      })),
+      countdowns: groupState.countdowns || [],
+      calendarEvents: (groupState.calendarEvents || []).map(e => ({
+        ...e,
+        createdBy: e.createdBy === userId ? 'user_a' : 'user_b'
+      })),
+      privateNotes: (groupState.privateNotes || []).map(n => ({
+        ...n,
+        senderId: n.senderId === userId ? 'user_a' : 'user_b'
+      })),
+      bucketList: groupState.bucketList || [],
+      liveLocationA: groupState.liveLocationA || { enabled: false },
+      liveLocationB: groupState.liveLocationB || { enabled: false },
+      photoVault: (groupState.photoVault || []).map(p => ({
+        ...p,
+        uploaderId: p.uploaderId === userId ? 'user_a' : 'user_b'
+      })),
+      journalEntries: (groupState.journalEntries || []).map(j => ({
+        ...j,
+        authorId: j.authorId === userId ? 'user_a' : 'user_b',
+        reactions: (j.reactions || []).map(rid => rid === userId ? 'user_a' : 'user_b')
       }))
     };
   }
@@ -302,6 +346,39 @@ const mapStateForUser = (groupState: FullHEMOState, userId: string): FullHEMOSta
       ...item,
       uploaderId: item.uploaderId === userId ? 'user_a' : 'user_b'
     })),
+    missYouHistory: (groupState.missYouHistory || []).map(m => ({
+      ...m,
+      senderId: m.senderId === userId ? 'user_a' : 'user_b'
+    })),
+    quickReactionsHistory: (groupState.quickReactionsHistory || []).map(q => ({
+      ...q,
+      senderId: q.senderId === userId ? 'user_a' : 'user_b'
+    })),
+    dailyMemories: (groupState.dailyMemories || []).map(d => ({
+      ...d,
+      uploaderId: d.uploaderId === userId ? 'user_a' : 'user_b'
+    })),
+    countdowns: groupState.countdowns || [],
+    calendarEvents: (groupState.calendarEvents || []).map(e => ({
+      ...e,
+      createdBy: e.createdBy === userId ? 'user_a' : 'user_b'
+    })),
+    privateNotes: (groupState.privateNotes || []).map(n => ({
+      ...n,
+      senderId: n.senderId === userId ? 'user_a' : 'user_b'
+    })),
+    bucketList: groupState.bucketList || [],
+    liveLocationA: groupState.liveLocationB || { enabled: false }, // Swapped!
+    liveLocationB: groupState.liveLocationA || { enabled: false }, // Swapped!
+    photoVault: (groupState.photoVault || []).map(p => ({
+      ...p,
+      uploaderId: p.uploaderId === userId ? 'user_a' : 'user_b'
+    })),
+    journalEntries: (groupState.journalEntries || []).map(j => ({
+      ...j,
+      authorId: j.authorId === userId ? 'user_a' : 'user_b',
+      reactions: (j.reactions || []).map(rid => rid === userId ? 'user_a' : 'user_b')
+    }))
   };
   return swapped;
 };
@@ -626,6 +703,50 @@ app.post('/api/state', (req, res) => {
           ...item,
           uploaderId: item.uploaderId === 'user_a' ? groupState.settings.userA.id : groupState.settings.userB.id
         }));
+      } else if (key === 'missYouHistory') {
+        groupState.missYouHistory = value.map((m: any) => ({
+          ...m,
+          senderId: m.senderId === 'user_a' ? groupState.settings.userA.id : groupState.settings.userB.id
+        }));
+      } else if (key === 'quickReactionsHistory') {
+        groupState.quickReactionsHistory = value.map((q: any) => ({
+          ...q,
+          senderId: q.senderId === 'user_a' ? groupState.settings.userA.id : groupState.settings.userB.id
+        }));
+      } else if (key === 'dailyMemories') {
+        groupState.dailyMemories = value.map((d: any) => ({
+          ...d,
+          uploaderId: d.uploaderId === 'user_a' ? groupState.settings.userA.id : groupState.settings.userB.id
+        }));
+      } else if (key === 'countdowns') {
+        groupState.countdowns = value;
+      } else if (key === 'calendarEvents') {
+        groupState.calendarEvents = value.map((e: any) => ({
+          ...e,
+          createdBy: e.createdBy === 'user_a' ? groupState.settings.userA.id : groupState.settings.userB.id
+        }));
+      } else if (key === 'privateNotes') {
+        groupState.privateNotes = value.map((n: any) => ({
+          ...n,
+          senderId: n.senderId === 'user_a' ? groupState.settings.userA.id : groupState.settings.userB.id
+        }));
+      } else if (key === 'bucketList') {
+        groupState.bucketList = value;
+      } else if (key === 'liveLocationA') {
+        groupState.liveLocationA = value;
+      } else if (key === 'liveLocationB') {
+        groupState.liveLocationB = value;
+      } else if (key === 'photoVault') {
+        groupState.photoVault = value.map((p: any) => ({
+          ...p,
+          uploaderId: p.uploaderId === 'user_a' ? groupState.settings.userA.id : groupState.settings.userB.id
+        }));
+      } else if (key === 'journalEntries') {
+        groupState.journalEntries = value.map((j: any) => ({
+          ...j,
+          authorId: j.authorId === 'user_a' ? groupState.settings.userA.id : groupState.settings.userB.id,
+          reactions: (j.reactions || []).map((rid: string) => rid === 'user_a' ? groupState.settings.userA.id : groupState.settings.userB.id)
+        }));
       }
     } else {
       // For User B, swap perspective back
@@ -711,6 +832,50 @@ app.post('/api/state', (req, res) => {
           ...item,
           uploaderId: item.uploaderId === 'user_a' ? user.id : groupState.settings.userA.id
         }));
+      } else if (key === 'missYouHistory') {
+        groupState.missYouHistory = value.map((m: any) => ({
+          ...m,
+          senderId: m.senderId === 'user_a' ? user.id : groupState.settings.userA.id
+        }));
+      } else if (key === 'quickReactionsHistory') {
+        groupState.quickReactionsHistory = value.map((q: any) => ({
+          ...q,
+          senderId: q.senderId === 'user_a' ? user.id : groupState.settings.userA.id
+        }));
+      } else if (key === 'dailyMemories') {
+        groupState.dailyMemories = value.map((d: any) => ({
+          ...d,
+          uploaderId: d.uploaderId === 'user_a' ? user.id : groupState.settings.userA.id
+        }));
+      } else if (key === 'countdowns') {
+        groupState.countdowns = value;
+      } else if (key === 'calendarEvents') {
+        groupState.calendarEvents = value.map((e: any) => ({
+          ...e,
+          createdBy: e.createdBy === 'user_a' ? user.id : groupState.settings.userA.id
+        }));
+      } else if (key === 'privateNotes') {
+        groupState.privateNotes = value.map((n: any) => ({
+          ...n,
+          senderId: n.senderId === 'user_a' ? user.id : groupState.settings.userA.id
+        }));
+      } else if (key === 'bucketList') {
+        groupState.bucketList = value;
+      } else if (key === 'liveLocationA') {
+        groupState.liveLocationB = value; // Swapped!
+      } else if (key === 'liveLocationB') {
+        groupState.liveLocationA = value; // Swapped!
+      } else if (key === 'photoVault') {
+        groupState.photoVault = value.map((p: any) => ({
+          ...p,
+          uploaderId: p.uploaderId === 'user_a' ? user.id : groupState.settings.userA.id
+        }));
+      } else if (key === 'journalEntries') {
+        groupState.journalEntries = value.map((j: any) => ({
+          ...j,
+          authorId: j.authorId === 'user_a' ? user.id : groupState.settings.userA.id,
+          reactions: (j.reactions || []).map((rid: string) => rid === 'user_a' ? user.id : groupState.settings.userA.id)
+        }));
       }
     }
 
@@ -729,6 +894,32 @@ app.post('/api/state', (req, res) => {
           actionId: latestAction.id
         });
       }
+    } else if (key === 'missYouHistory' && Array.isArray(value) && value.length > 0) {
+      const latestMissYou = value[0];
+      const nickname = user.nickname || 'Your partner';
+      notifyPartner(user.groupId, user.id, {
+        type: 'missyou',
+        title: 'Miss You ❤️',
+        message: `${nickname} misses you.`
+      });
+    } else if (key === 'quickReactionsHistory' && Array.isArray(value) && value.length > 0) {
+      const latestReaction = value[0];
+      const nickname = user.nickname || 'Your partner';
+      notifyPartner(user.groupId, user.id, {
+        type: 'quickreaction',
+        emoji: latestReaction.emoji,
+        label: latestReaction.label,
+        title: `Love Reaction ${latestReaction.emoji}`,
+        message: `${nickname} sent a quick reaction: ${latestReaction.label} ${latestReaction.emoji}`
+      });
+    } else if (key === 'privateNotes' && Array.isArray(value) && value.length > 0) {
+      const latestNote = value[0];
+      const nickname = user.nickname || 'Your partner';
+      notifyPartner(user.groupId, user.id, {
+        type: 'privatenote',
+        title: 'Private Note 📝',
+        message: `${nickname} left you a note: "${latestNote.text}"`
+      });
     } else if (key === 'userAStatus' || key === 'userBStatus') {
       const statusVal = value;
       const nickname = user.nickname || 'Your partner';
