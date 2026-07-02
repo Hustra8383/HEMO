@@ -13,9 +13,10 @@ interface MemeCornerProps {
   onAddMeme: (meme: Meme) => void;
   onReactMeme: (id: string) => void;
   onRemoveMeme: (id: string) => void;
+  partnerName: string;
 }
 
-export default function MemeCorner({ memes, onAddMeme, onReactMeme, onRemoveMeme }: MemeCornerProps) {
+export default function MemeCorner({ memes, onAddMeme, onReactMeme, onRemoveMeme, partnerName }: MemeCornerProps) {
   const [url, setUrl] = useState('');
   const [caption, setCaption] = useState('');
   const [isAdding, setIsAdding] = useState(false);
@@ -135,16 +136,22 @@ export default function MemeCorner({ memes, onAddMeme, onReactMeme, onRemoveMeme
                   />
 
                   {/* Delete button (owner action simulation) */}
-                  <button
-                    onClick={() => onRemoveMeme(m.id)}
-                    className="absolute top-3 right-3 p-1.5 bg-black/60 rounded-lg text-gray-400 hover:text-red-400 transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {m.uploaderId === 'user_a' && (
+                    <button
+                      onClick={() => onRemoveMeme(m.id)}
+                      className="absolute top-3 right-3 p-1.5 bg-black/60 rounded-lg text-gray-400 hover:text-red-400 transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
 
                 {/* Info and reactions */}
                 <div className="p-4 space-y-3">
+                  <div className="flex justify-between items-center text-[10px] text-gray-500 font-mono">
+                    <span>From: <b>{m.uploaderId === 'user_a' ? 'You' : partnerName}</b></span>
+                  </div>
+
                   <p className="text-xs text-gray-200 font-light line-clamp-2 leading-relaxed font-sans">
                     {m.caption}
                   </p>

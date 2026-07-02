@@ -59,6 +59,7 @@ export interface CheckInLog {
   type: CheckInType;
   label: string;
   timestamp: string;
+  emoji?: string;
 }
 
 export interface Goal {

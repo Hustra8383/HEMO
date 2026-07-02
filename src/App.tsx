@@ -31,6 +31,7 @@ import {
 
 import { FullHEMOState, Mood, LiveStatus, Goal, Habit, Memory, VoiceNote, TwistOfDay, TimeCapsule, RelationshipMilestone, Meme, NightReflection, Profile, CompanionState, IHaveYouAction } from './types';
 import { TwistResponse } from './components/TwistOfTheDay';
+import { usePartnerState } from './hooks/usePartnerState';
 
 // Subcomponents
 import AuthPortal from './components/AuthPortal';
@@ -336,6 +337,7 @@ export default function App() {
     );
   }
 
+  const partnerState = usePartnerState(state);
   const { settings, userAMoods, userBMoods, userAStatus, userBStatus, userACheckIns, userBCheckIns, userAGoals, habitsA, memories, voiceNotes, twists, dreams, capsules, milestones, memes, reflections } = state;
 
   // Compute stats
@@ -819,34 +821,21 @@ export default function App() {
 
             {activeTab === 'memes' && (
               <MemeCorner
-                memes={memes}
-                onAddMeme={(m) => saveStateField('memes', [m, ...memes])}
+                memes={partnerState?.memes || memes}
+                onAddMeme={(m) => saveStateField('memes', [m, ...(partnerState?.memes || memes)])}
                 onReactMeme={(id) => {
-                  const updated = memes.map(m => m.id === id ? { ...m, laughs: m.laughs + 1 } : m);
+                  const currentMemes = partnerState?.memes || memes;
+                  const updated = currentMemes.map(m => m.id === id ? { ...m, laughCount: (m.laughCount || 0) + 1 } : m);
                   saveStateField('memes', updated);
                 }}
-                onRemoveMeme={(id) => saveStateField('memes', memes.filter(m => m.id !== id))}
+                onRemoveMeme={(id) => saveStateField('memes', (partnerState?.memes || memes).filter(m => m.id !== id))}
+                partnerName={settings.userB.nickname}
               />
             )}
 
             {activeTab === 'checkins' && (
               <DailyCheckIns
-                checkIns={[
-                  ...userACheckIns.map((c: any) => ({
-                    id: c.timestamp,
-                    statusText: c.label,
-                    emoji: c.emoji || '📍',
-                    timestamp: c.timestamp,
-                    userId: 'user_a'
-                  })),
-                  ...userBCheckIns.map((c: any) => ({
-                    id: c.timestamp,
-                    statusText: c.label,
-                    emoji: c.emoji || '📍',
-                    timestamp: c.timestamp,
-                    userId: 'user_b'
-                  }))
-                ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())}
+                checkIns={partnerState?.checkIns || []}
                 onAddCheckIn={(text, emoji) => {
                   const newC = { type: 'custom' as any, label: text, emoji, timestamp: new Date().toISOString() };
                   saveStateField('userACheckIns', [newC, ...userACheckIns]);
@@ -857,9 +846,9 @@ export default function App() {
 
             {activeTab === 'voice' && (
               <VoiceNotes
-                voiceNotes={voiceNotes}
-                onAddVoiceNote={(v) => saveStateField('voiceNotes', [v, ...voiceNotes])}
-                onRemoveVoiceNote={(id) => saveStateField('voiceNotes', voiceNotes.filter(v => v.id !== id))}
+                voiceNotes={partnerState?.voiceNotes || voiceNotes}
+                onAddVoiceNote={(v) => saveStateField('voiceNotes', [v, ...(partnerState?.voiceNotes || voiceNotes)])}
+                onRemoveVoiceNote={(id) => saveStateField('voiceNotes', (partnerState?.voiceNotes || voiceNotes).filter(v => v.id !== id))}
                 partnerName={settings.userB.nickname}
               />
             )}

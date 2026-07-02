@@ -293,12 +293,14 @@ export default function VoiceNotes({ voiceNotes, onAddVoiceNote, onRemoveVoiceNo
 
                   <div className="text-right shrink-0 flex items-center gap-3">
                     <span className="text-[10px] font-mono text-gray-400">{note.duration}s</span>
-                    <button
-                      onClick={() => onRemoveVoiceNote(note.id)}
-                      className="text-gray-600 hover:text-red-400 transition-all cursor-pointer"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {note.uploaderId === 'user_a' && (
+                      <button
+                        onClick={() => onRemoveVoiceNote(note.id)}
+                        className="text-gray-600 hover:text-red-400 transition-all cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))
