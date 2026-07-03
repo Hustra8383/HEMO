@@ -7,6 +7,18 @@ import { initApiMock } from './apiMock.ts';
 // Enable self-healing dual-mode client database fallback for static environments like Netlify
 initApiMock();
 
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then((registration) => {
+        console.log('HEMO Service Worker registered with scope:', registration.scope);
+      })
+      .catch((error) => {
+        console.error('HEMO Service Worker registration failed:', error);
+      });
+  });
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />

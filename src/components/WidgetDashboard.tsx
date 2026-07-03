@@ -43,6 +43,27 @@ import {
   JournalEntry
 } from '../types';
 
+
+const ACTIVITIES = [
+  { type: 'studying', label: 'Studying', emoji: '📚' },
+  { type: 'sleeping', label: 'Sleeping', emoji: '🌙' },
+  { type: 'atschool', label: 'At School', emoji: '🏫' },
+  { type: 'atcollege', label: 'At College', emoji: '🎓' },
+  { type: 'working', label: 'Working', emoji: '💼' },
+  { type: 'busy', label: 'Busy', emoji: '🔴' },
+  { type: 'free', label: 'Free', emoji: '🟢' },
+  { type: 'gaming', label: 'Gaming', emoji: '🎮' },
+  { type: 'travelling', label: 'Traveling', emoji: '✈️' },
+  { type: 'eating', label: 'Eating', emoji: '🍲' },
+  { type: 'withfamily', label: 'With Family', emoji: '👨‍👩‍👧‍👦' },
+  { type: 'watchingmovie', label: 'Watching Movie', emoji: '🎬' },
+  { type: 'exercising', label: 'Exercising', emoji: '🏋️' },
+  { type: 'shopping', label: 'Shopping', emoji: '🛍️' },
+  { type: 'relaxing', label: 'Relaxing', emoji: '😌' },
+  { type: 'reading', label: 'Reading', emoji: '📖' },
+  { type: 'custom', label: 'Custom', emoji: '✨' }
+];
+
 interface WidgetDashboardProps {
   state: FullHEMOState;
   userId: string;
@@ -148,6 +169,169 @@ export default function WidgetDashboard({
       }
     }
   };
+
+  const handlePressSqueezeHug = async () => {
+    playChime();
+    triggerVibration();
+    triggerFloatingHearts();
+
+    const timestamp = new Date().toISOString();
+    const newAction = {
+      id: `act_${Date.now()}`,
+      senderId: 'user_a',
+      type: 'hug' as const,
+      message: `${state.settings.userA.nickname} sent you an instant Virtual Hug! 🫂💖`,
+      timestamp,
+      acknowledged: false,
+    };
+
+    const currentActions = state.actions || [];
+    await saveStateField('actions', [newAction, ...currentActions]);
+    showLocalNotification('🫂 Hug Sent!', 'Your partner will receive a beautiful tactile heartburst on their screen.');
+  };
+
+  const compileSharedRelationshipTimeline = () => {
+    const events: { id: string; text: string; emoji: string; timestamp: string; senderNickname: string }[] = [];
+
+    const getNickname = (senderId: string) => {
+      if (senderId === 'user_a') return settings.userA.nickname;
+      if (senderId === 'user_b') return settings.userB.nickname;
+      return senderId === userId ? settings.userA.nickname : settings.userB.nickname;
+    };
+
+    if (Array.isArray(state.actions)) {
+      state.actions.forEach((a) => {
+        const isUserA = a.senderId === userId || a.senderId === 'user_a';
+        events.push({
+          id: a.id || `hug_${a.timestamp}`,
+          text: isUserA 
+            ? `You hugged ${settings.userB.nickname} 🫂` 
+            : `${settings.userB.nickname} hugged you 🫂`,
+          emoji: '🫂',
+          timestamp: a.timestamp,
+          senderNickname: getNickname(a.senderId)
+        });
+      });
+    }
+
+    if (Array.isArray(state.missYouHistory)) {
+      state.missYouHistory.forEach((m) => {
+        const isUserA = m.senderId === 'user_a';
+        events.push({
+          id: m.id || `my_${m.timestamp}`,
+          text: isUserA 
+            ? `You sent a Miss You Nudge ❤️` 
+            : `${settings.userB.nickname} sent a Miss You Nudge ❤️`,
+          emoji: '❤️',
+          timestamp: m.timestamp,
+          senderNickname: getNickname(m.senderId)
+        });
+      });
+    }
+
+    if (Array.isArray(state.userAMoods)) {
+      state.userAMoods.slice(0, 5).forEach((m, idx) => {
+        events.push({
+          id: `mooda_${idx}_${m.timestamp}`,
+          text: `You are feeling ${m.type.replace('_', ' ')} ${m.emoji}`,
+          emoji: m.emoji || '😊',
+          timestamp: m.timestamp,
+          senderNickname: settings.userA.nickname
+        });
+      });
+    }
+    if (Array.isArray(state.userBMoods)) {
+      state.userBMoods.slice(0, 5).forEach((m, idx) => {
+        events.push({
+          id: `moodb_${idx}_${m.timestamp}`,
+          text: `${settings.userB.nickname} is feeling ${m.type.replace('_', ' ')} ${m.emoji}`,
+          emoji: m.emoji || '😊',
+          timestamp: m.timestamp,
+          senderNickname: settings.userB.nickname
+        });
+      });
+    }
+
+    if (Array.isArray(state.quickReactionsHistory)) {
+      state.quickReactionsHistory.forEach((q) => {
+        const isUserA = q.senderId === 'user_a';
+        events.push({
+          id: q.id || `qr_${q.timestamp}`,
+          text: isUserA
+            ? `You reacted: ${q.label} ${q.emoji}`
+            : `${settings.userB.nickname} reacted: ${q.label} ${q.emoji}`,
+          emoji: q.emoji,
+          timestamp: q.timestamp,
+          senderNickname: getNickname(q.senderId)
+        });
+      });
+    }
+
+    if (Array.isArray(state.voiceNotes)) {
+      state.voiceNotes.forEach((v) => {
+        const isUserA = v.uploaderId === userId || v.uploaderId === 'user_a';
+        events.push({
+          id: v.id || `vn_${v.timestamp}`,
+          text: isUserA
+            ? `You whispered a voice note 🎤`
+            : `${settings.userB.nickname} whispered a voice note 🎤`,
+          emoji: '🎤',
+          timestamp: v.timestamp,
+          senderNickname: isUserA ? settings.userA.nickname : settings.userB.nickname
+        });
+      });
+    }
+
+    if (Array.isArray(state.photoVault)) {
+      state.photoVault.forEach((p) => {
+        const isUserA = p.uploaderId === userId || p.uploaderId === 'user_a';
+        events.push({
+          id: p.id || `photo_${p.timestamp}`,
+          text: isUserA
+            ? `You added today's Polaroid memory 📸`
+            : `${settings.userB.nickname} added today's Polaroid memory 📸`,
+          emoji: '📸',
+          timestamp: p.timestamp,
+          senderNickname: isUserA ? settings.userA.nickname : settings.userB.nickname
+        });
+      });
+    }
+
+    if (Array.isArray(state.journalEntries)) {
+      state.journalEntries.forEach((j) => {
+        const isUserA = j.authorId === userId || j.authorId === 'user_a';
+        events.push({
+          id: j.id || `jr_${j.timestamp}`,
+          text: isUserA
+            ? `You wrote in our Shared Journal 🖋️`
+            : `${settings.userB.nickname} wrote in our Shared Journal 🖋️`,
+          emoji: '🖋️',
+          timestamp: j.timestamp,
+          senderNickname: isUserA ? settings.userA.nickname : settings.userB.nickname
+        });
+      });
+    }
+
+    return events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 15);
+  };
+
+  const formatRelativeTime = (isoString: string) => {
+    try {
+      const date = new Date(isoString);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return `${diffHours}h ago`;
+      return date.toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+      return 'Recently';
+    }
+  };
+
 
   const triggerFloatingHearts = () => {
     const hearts = Array.from({ length: 15 }).map((_, i) => ({
@@ -597,68 +781,139 @@ export default function WidgetDashboard({
         ))}
       </div>
 
-      {/* Love counter & Welcome Row */}
+      {/* Presence & Vibe Board (ONE SHARED RELATIONSHIP SPACE) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Widget: Welcome & Streak */}
-        <div className="glass-panel p-6 rounded-3xl relative overflow-hidden flex flex-col justify-between border border-pink-500/10 col-span-2">
-          <div>
-            <h3 className="font-serif text-3xl font-bold tracking-tight text-gray-100 flex items-center gap-2">
-              Welcome Back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-indigo-400">{settings.userA.nickname}</span>
-              <Sparkles className="w-5 h-5 text-pink-400 animate-spin" style={{ animationDuration: '8s' }} />
-            </h3>
-            <p className="text-xs text-gray-400 font-mono uppercase tracking-widest mt-1">
-              Sanctuary status: Aligned • Locked to {settings.userB.nickname}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 mt-6">
-            <div className="p-4 bg-white/3 border border-white/5 rounded-2xl">
-              <span className="text-3xl font-mono font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-indigo-400">
+        {/* Widget: Side-by-Side Presence & Vibe Board */}
+        <div className="glass-panel p-6 rounded-3xl relative overflow-hidden flex flex-col justify-between border border-pink-500/10 col-span-2 bg-gradient-to-br from-[#121020]/80 via-black/40 to-black/90">
+          <div className="flex justify-between items-start">
+            <div>
+              <h3 className="font-serif text-3xl font-bold tracking-tight text-gray-100 flex items-center gap-2">
+                Our Shared Space <Sparkles className="w-5 h-5 text-pink-400 animate-pulse" />
+              </h3>
+              <p className="text-xs text-gray-400 font-mono uppercase tracking-widest mt-1">
+                Sanctuary status: Permanently Connected • One Relationship
+              </p>
+            </div>
+            <div className="text-right">
+              <span className="text-2xl font-mono font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-indigo-400">
                 {(() => {
                   const start = settings.relationshipStartDate || new Date().toISOString().split('T')[0];
                   const diffDays = Math.max(1, Math.floor(Math.abs(Date.now() - new Date(start).getTime()) / (1000 * 60 * 60 * 24)));
-                  return `${diffDays} Days`;
+                  return `${diffDays} Days Together`;
                 })()}
               </span>
-              <span className="text-[10px] text-gray-400 block font-mono uppercase tracking-wide mt-1">Relationship Duration</span>
             </div>
-            <div className="p-4 bg-white/3 border border-white/5 rounded-2xl flex flex-col justify-center">
-              <span className="text-lg font-serif font-bold text-pink-300">
-                {state.bucketList?.filter(b => b.completed).length || 0} / {state.bucketList?.length || 0}
-              </span>
-              <span className="text-[10px] text-gray-400 block font-mono uppercase tracking-wide">Shared Bucket Completed</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+            {/* Left Column: YOU */}
+            <div className="p-4 bg-white/3 border border-white/5 rounded-2xl relative overflow-hidden flex flex-col justify-between space-y-3">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <span className="text-xs font-mono text-gray-300 font-bold">YOU ({settings.userA.nickname})</span>
+                </div>
+                <span className="text-xs font-mono text-pink-400">Feeling: {state.userAMoods[0]?.emoji || '😊'}</span>
+              </div>
+
+              <div>
+                <span className="text-[10px] text-gray-400 font-mono uppercase block">Active Presence</span>
+                <span className="text-sm font-serif font-bold text-gray-100 block">
+                  {(() => {
+                    const act = userAStatus.activity || 'free';
+                    const matched = ACTIVITIES.find(a => a.type === act);
+                    return `${matched ? matched.emoji : '✨'} ${matched ? matched.label : act}`;
+                  })()}
+                </span>
+                {userAStatus.customStatus && (
+                  <p className="text-xs text-gray-400 italic mt-0.5 truncate">"{userAStatus.customStatus}"</p>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-2 border-t border-white/5">
+                <button
+                  onClick={() => setActiveTab('status')}
+                  className="w-full py-1.5 bg-pink-500/10 hover:bg-pink-500/20 text-pink-300 text-[10px] font-bold font-mono uppercase tracking-wider rounded-xl transition-all cursor-pointer text-center"
+                >
+                  Update Vibe / Deep Focus 🚀
+                </button>
+              </div>
+            </div>
+
+            {/* Right Column: PARTNER */}
+            <div className="p-4 bg-white/3 border border-white/5 rounded-2xl relative overflow-hidden flex flex-col justify-between space-y-3">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <span className="text-xs font-mono text-gray-300 font-bold">{settings.userB.nickname}</span>
+                </div>
+                <span className="text-xs font-mono text-indigo-400">Feeling: {state.userBMoods[0]?.emoji || '😊'}</span>
+              </div>
+
+              <div>
+                <span className="text-[10px] text-gray-400 font-mono uppercase block">Active Presence</span>
+                <span className="text-sm font-serif font-bold text-gray-100 block">
+                  {(() => {
+                    const act = userBStatus.activity || 'free';
+                    const matched = ACTIVITIES.find(a => a.type === act);
+                    return `${matched ? matched.emoji : '✨'} ${matched ? matched.label : act}`;
+                  })()}
+                </span>
+                {userBStatus.customStatus ? (
+                  <p className="text-xs text-gray-400 italic mt-0.5 truncate">"{userBStatus.customStatus}"</p>
+                ) : (
+                  <p className="text-xs text-gray-500 italic mt-0.5">Quietly connected</p>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-2 border-t border-white/5 justify-between text-[10px] text-gray-400 font-mono">
+                <span>Last seen: <b className="text-gray-300">{userBStatus.updatedAt ? formatRelativeTime(userBStatus.updatedAt) : 'Recently'}</b></span>
+                {userBStatus.focusMode && (
+                  <span className="text-purple-400 animate-pulse font-bold">🔴 IN DEEP FOCUS</span>
+                )}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* 12. Miss You ❤️ Action Widget */}
+        {/* Double Telepathy Nudge Sanctuary */}
         <div className="glass-panel p-6 rounded-3xl border border-pink-500/15 flex flex-col justify-between relative overflow-hidden bg-gradient-to-tr from-pink-950/20 to-indigo-950/20">
           <div className="space-y-1">
-            <span className="text-[10px] font-mono text-pink-400 uppercase tracking-widest font-bold">Miss You System</span>
-            <h4 className="text-md font-serif font-bold text-gray-100">Send Telepathy Nudge</h4>
+            <span className="text-[10px] font-mono text-pink-400 uppercase tracking-widest font-bold">Telepathy Sanctuary</span>
+            <h4 className="text-md font-serif font-bold text-gray-100">Send Telepathy Spark</h4>
           </div>
 
-          <div className="flex flex-col items-center py-4">
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={handlePressMissYou}
-              className="w-16 h-16 rounded-full bg-gradient-to-tr from-pink-500 to-rose-600 flex items-center justify-center shadow-lg shadow-pink-500/30 cursor-pointer"
-            >
-              <Heart className="w-8 h-8 text-white fill-white/20 animate-pulse" />
-            </motion.button>
-            <span className="text-[11px] text-gray-400 font-mono mt-3">Tap to send a Miss You ❤️</span>
+          <div className="grid grid-cols-2 gap-4 py-3">
+            <div className="flex flex-col items-center">
+              <motion.button
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.92 }}
+                onClick={handlePressMissYou}
+                className="w-14 h-14 rounded-full bg-gradient-to-tr from-pink-500 to-rose-600 flex items-center justify-center shadow-lg shadow-pink-500/30 cursor-pointer"
+              >
+                <Heart className="w-7 h-7 text-white fill-white/20 animate-pulse" />
+              </motion.button>
+              <span className="text-[10px] text-gray-300 font-bold font-mono mt-2">Miss You</span>
+              <span className="text-[9px] text-gray-500 font-mono">Telepathy ❤️</span>
+            </div>
+
+            <div className="flex flex-col items-center">
+              <motion.button
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.92 }}
+                onClick={handlePressSqueezeHug}
+                className="w-14 h-14 rounded-full bg-gradient-to-tr from-indigo-500 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/30 cursor-pointer"
+              >
+                <span className="text-2xl filter drop-shadow">🫂</span>
+              </motion.button>
+              <span className="text-[10px] text-gray-300 font-bold font-mono mt-2">Squeeze Hug</span>
+              <span className="text-[9px] text-gray-500 font-mono">Heartburst 🫂</span>
+            </div>
           </div>
 
-          <div className="border-t border-white/5 pt-2 text-[10px] text-gray-500 font-mono flex justify-between items-center">
-            <span>Last Sent: <b className="text-gray-300">
-              {state.missYouHistory?.filter(m => m.senderId === 'user_a')[0] 
-                ? new Date(state.missYouHistory.filter(m => m.senderId === 'user_a')[0].timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
-                : 'Never'}
-            </b></span>
-            <span>Partner sent: <b className="text-pink-400">
-              {state.missYouHistory?.filter(m => m.senderId === 'user_b')[0] ? 'Yes! ❤️' : 'No'}
-            </b></span>
+          <div className="border-t border-white/5 pt-2 text-[9px] text-gray-500 font-mono flex justify-between items-center">
+            <span>Hugs Squeezed: <b className="text-pink-400">{state.actions?.filter(a => a.type === 'hug').length || 0}</b></span>
+            <span>Miss Yous: <b className="text-indigo-400">{state.missYouHistory?.length || 0}</b></span>
           </div>
         </div>
       </div>
